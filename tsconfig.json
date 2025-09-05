@@ -35,7 +35,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, ".next/types/app/truck-owners/page.tsx"  ],
   "exclude": [
     "node_modules"
   ]

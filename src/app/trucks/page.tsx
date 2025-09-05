@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,6 @@ export default function TrucksPage() {
 
     (async () => {
       try {
-        // Fetch truck owners (profiles with role = 'truck_owner')
         const { data: owners, error: ownersError } = await supabase
           .from('profiles')
           .select('id, full_name')
@@ -65,7 +65,6 @@ export default function TrucksPage() {
         }
         setTruckOwners(owners || []);
 
-        // Fetch trucks with owner's full_name via join
         const { data: t, error: trucksError } = await supabase
           .from('trucks')
           .select('*, profiles!trucks_owner_id_fkey(full_name)')
@@ -301,7 +300,12 @@ export default function TrucksPage() {
           <h2 className="text-xl font-bold">{editingTruckId ? 'Editing Truck' : 'Add Truck'}</h2>
           <div className="grid md:grid-cols-2 gap-3">
             <div>
-              <Label>Truck Owner</Label>
+              <div className="flex justify-between items-center mb-2">
+                <Label>Truck Owner</Label>
+                <Link href="/truck-owners?returnTo=/trucks" className="text-blue-600 hover:underline text-sm">
+                  Missing Owner? Add here
+                </Link>
+              </div>
               <select
                 className="w-full border rounded p-2"
                 value={form.owner_id}
