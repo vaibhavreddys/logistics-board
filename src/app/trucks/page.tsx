@@ -1,164 +1,403 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
+import { X, Pencil } from 'lucide-react';
 
-export default function Trucks() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [vehicle_number, setVN] = useState('');
-  const [vehicle_type, setVT] = useState('');
-  const [capacity_kg, setCap] = useState('');
-  const [loading, setLoading] = useState(true);
+export default function TrucksPage() {
+  const [form, setForm] = useState({
+    owner_id: '',
+    vehicle_number: '',
+    vehicle_type: '',
+    capacity_kg: '',
+    active: true,
+  });
+  const [truckOwners, setTruckOwners] = useState<any[]>([]);
+  const [trucks, setTrucks] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [editingTruckId, setEditingTruckId] = useState<string | null>(null);
   const router = useRouter();
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        setLoading(true);
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
           console.error('Auth error or no user:', userError?.message);
           router.push('/login');
           return;
         }
-
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();
-
-        if (profileError) {
-          console.error('Profile fetch error:', profileError.message);
-          setError('Failed to fetch user profile. Please try again.');
+        if (profileError || profile?.role !== 'admin') {
+          console.error('Profile fetch error or not admin:', profileError?.message);
           router.push('/');
-          return;
-        }
-
-        if (profile?.role !== 'truck_owner' && profile?.role !== 'admin') {
-          console.warn('User is not a truck_owner or an admin:', profile?.role);
-          router.push('/');
-          return;
-        }
-
-        // Fetch trucks data only if user is authenticated and has correct role
-        const { data, error: trucksError } = await supabase
-          .from('trucks')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (trucksError) {
-          console.error('Trucks fetch error:', trucksError.message);
-          setError('Failed to fetch trucks. Please try again.');
-        } else {
-          setRows(data || []);
         }
       } catch (err) {
         console.error('Unexpected error in checkAuth:', err);
         setError('An unexpected error occurred. Please try again.');
-        router.push('/');
-      } finally {
-        setLoading(false);
       }
     };
-
     checkAuth();
+
+    (async () => {
+      try {
+        // Fetch truck owners (profiles with role = 'truck_owner')
+        const { data: owners, error: ownersError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'truck_owner');
+        if (ownersError) {
+          console.error('Error fetching truck owners:', ownersError.message);
+          setError('Failed to load truck owners.');
+          return;
+        }
+        setTruckOwners(owners || []);
+
+        // Fetch trucks with owner's full_name via join
+        const { data: t, error: trucksError } = await supabase
+          .from('trucks')
+          .select('*, profiles!trucks_owner_id_fkey(full_name)')
+          .order('created_at', { ascending: false });
+        if (trucksError) {
+          console.error('Error fetching trucks:', trucksError.message);
+          setError('Failed to load trucks.');
+          return;
+        }
+        setTrucks(t || []);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again.');
+      }
+    })();
   }, [router]);
 
-  const add = async () => {
+  const validateForm = () => {
+    if (!form.owner_id) return 'Please select a truck owner.';
+    if (!form.vehicle_number || !/^[A-Z0-9-]+$/.test(form.vehicle_number)) return 'Please enter a valid vehicle number (alphanumeric with hyphens).';
+    if (!form.vehicle_type) return 'Please enter a vehicle type.';
+    if (!form.capacity_kg || Number(form.capacity_kg) <= 0) return 'Please enter a valid capacity (kg).';
+    return null;
+  };
+
+  const createTruck = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      setError(null);
+      setSuccess(null);
+
+      const validationError = validateForm();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('No authenticated user:', userError?.message);
+        setError('You must be logged in to create a truck.');
         router.push('/login');
         return;
       }
 
-      const { data, error } = await supabase.from('trucks').insert({
-        vehicle_number,
-        vehicle_type,
-        capacity_kg: Number(capacity_kg) || null,
-        owner_id: user.id,
-      });
+      const payload = {
+        owner_id: form.owner_id,
+        vehicle_number: form.vehicle_number,
+        vehicle_type: form.vehicle_type,
+        capacity_kg: Number(form.capacity_kg),
+        active: form.active,
+      };
 
-      if (error) {
-        console.error('Error adding truck:', error.message);
-        setError('Failed to add truck. Please try again.');
+      const { data: truck, error: truckError } = await supabase
+        .from('trucks')
+        .insert(payload)
+        .select('*, profiles!trucks_owner_id_fkey(full_name)')
+        .single();
+      if (truckError) {
+        console.error('Error creating truck:', truckError.message);
+        setError(`Failed to create truck: ${truckError.message}`);
         return;
       }
 
-      const { data: updatedData, error: fetchError } = await supabase
-        .from('trucks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (fetchError) {
-        console.error('Error fetching updated trucks:', fetchError.message);
-        setError('Failed to refresh trucks list. Please try again.');
-      } else {
-        setRows(updatedData || []);
-        setVN('');
-        setVT('');
-        setCap('');
-      }
+      setTrucks(prev => [truck, ...prev]);
+      setForm({
+        owner_id: '',
+        vehicle_number: '',
+        vehicle_type: '',
+        capacity_kg: '',
+        active: true,
+      });
+      setEditingTruckId(null);
+      setSuccess('Truck created successfully!');
+      setTimeout(() => {
+        setSuccess(null);
+      }, 5000);
     } catch (err) {
-      console.error('Unexpected error adding truck:', err);
-      setError('An unexpected error occurred. Please try again.');
+      console.error('Unexpected error creating truck:', err);
+      setError('An unexpected error occurred while creating the truck.');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  const updateTruck = async () => {
+    try {
+      setError(null);
+      setSuccess(null);
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-red-600">{error}</p>
-      </div>
+      const validationError = validateForm();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      if (!editingTruckId) {
+        setError('No truck selected for editing.');
+        return;
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('No authenticated user:', userError?.message);
+        setError('You must be logged in to update a truck.');
+        router.push('/login');
+        return;
+      }
+
+      const payload = {
+        owner_id: form.owner_id,
+        vehicle_number: form.vehicle_number,
+        vehicle_type: form.vehicle_type,
+        capacity_kg: Number(form.capacity_kg),
+        active: form.active,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: truck, error: truckError } = await supabase
+        .from('trucks')
+        .update(payload)
+        .eq('id', editingTruckId)
+        .select('*, profiles!trucks_owner_id_fkey(full_name)')
+        .single();
+      if (truckError) {
+        console.error('Error updating truck:', truckError.message);
+        setError(`Failed to update truck: ${truckError.message}`);
+        return;
+      }
+
+      setTrucks(prev =>
+        prev.map(t => (t.id === editingTruckId ? truck : t))
+      );
+      setForm({
+        owner_id: '',
+        vehicle_number: '',
+        vehicle_type: '',
+        capacity_kg: '',
+        active: true,
+      });
+      setEditingTruckId(null);
+      setSuccess('Truck updated successfully!');
+      setTimeout(() => {
+        setSuccess(null);
+      }, 5000);
+    } catch (err) {
+      console.error('Unexpected error updating truck:', err);
+      setError('An unexpected error occurred while updating the truck.');
+    }
+  };
+
+  const toggleActiveStatus = async (id: string, currentActive: boolean) => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('No authenticated user:', userError?.message);
+        setError('You must be logged in to update truck status.');
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from('trucks')
+        .update({ active: !currentActive })
+        .eq('id', id);
+      if (updateError) {
+        console.error('Error updating truck status:', updateError.message);
+        setError(`Failed to update truck status: ${updateError.message}`);
+        return;
+      }
+
+      setTrucks(prev =>
+        prev.map(t =>
+          t.id === id ? { ...t, active: !currentActive } : t
+        )
+      );
+    } catch (err) {
+      console.error('Error updating truck status:', err);
+      setError('Failed to update truck status. Please try again.');
+    }
+  };
+
+  const handleEdit = (truck: any) => {
+    setForm({
+      owner_id: truck.owner_id || '',
+      vehicle_number: truck.vehicle_number || '',
+      vehicle_type: truck.vehicle_type || '',
+      capacity_kg: truck.capacity_kg?.toString() || '',
+      active: truck.active,
+    });
+    setEditingTruckId(truck.id);
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setForm({
+      owner_id: '',
+      vehicle_number: '',
+      vehicle_type: '',
+      capacity_kg: '',
+      active: true,
+    });
+    setEditingTruckId(null);
+  };
+
+  const filteredTrucks = useMemo(() => {
+    const s = q.toLowerCase();
+    return trucks.filter(t =>
+      [t.vehicle_number, t.vehicle_type, t.profiles?.full_name || ''].some(f => f.toLowerCase().includes(s))
     );
-  }
+  }, [q, trucks]);
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
-      <main className="max-w-4xl mx-auto p-4 space-y-4">
-        <Card className="p-4 space-y-2">
-          <h2 className="font-semibold">Register Truck</h2>
-          <div className="grid md:grid-cols-3 gap-2">
-            <Input
-              placeholder="KA-01-AB-1234"
-              value={vehicle_number}
-              onChange={e => setVN(e.target.value)}
-            />
-            <Input
-              placeholder="32ft SXL Container"
-              value={vehicle_type}
-              onChange={e => setVT(e.target.value)}
-            />
-            <Input
-              placeholder="Capacity (kg)"
-              type="number"
-              value={capacity_kg}
-              onChange={e => setCap(e.target.value)}
-            />
+      <main className="max-w-6xl mx-auto p-4 space-y-6">
+        {error && (
+          <div className="bg-red-100 text-red-700 p-3 rounded mb-4 flex justify-between items-center">
+            {error}
+            <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
+              <X size={20} />
+            </button>
           </div>
-          <Button onClick={add}>Add Truck</Button>
+        )}
+        {success && (
+          <div className="bg-green-100 text-green-700 p-3 rounded mb-4 flex justify-between items-center animate-pulse z-50">
+            {success}
+            <button onClick={() => setSuccess(null)} className="text-green-700 hover:text-green-900">
+              <X size={20} />
+            </button>
+          </div>
+        )}
+        {/* Create/Edit truck form */}
+        <Card className="p-4 space-y-3" ref={formRef}>
+          <h2 className="text-xl font-bold">{editingTruckId ? 'Editing Truck' : 'Add Truck'}</h2>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div>
+              <Label>Truck Owner</Label>
+              <select
+                className="w-full border rounded p-2"
+                value={form.owner_id}
+                onChange={e => setForm({ ...form, owner_id: e.target.value })}
+              >
+                <option value="">Select owner</option>
+                {truckOwners.map(owner => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.full_name || 'Unknown'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Vehicle Number</Label>
+              <Input
+                value={form.vehicle_number}
+                onChange={e => setForm({ ...form, vehicle_number: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Vehicle Type</Label>
+              <Input
+                value={form.vehicle_type}
+                onChange={e => setForm({ ...form, vehicle_type: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Capacity (kg)</Label>
+              <Input
+                type="number"
+                value={form.capacity_kg}
+                onChange={e => setForm({ ...form, capacity_kg: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Active</Label>
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={e => setForm({ ...form, active: e.target.checked })}
+                className="ml-2"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={editingTruckId ? updateTruck : createTruck}>
+              {editingTruckId ? 'Update Truck' : 'Add Truck'}
+            </Button>
+            {editingTruckId && (
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          {rows.map(r => (
-            <Card key={r.id} className="p-3">{r.vehicle_number} • {r.vehicle_type} • {r.capacity_kg || '—'} kg</Card>
-          ))}
-        </div>
+        {/* Truck list */}
+        <section className="space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">Trucks ({filteredTrucks.length})</h2>
+            <Input
+              placeholder="Search vehicle number / type / owner"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {filteredTrucks.map(t => (
+              <Card key={t.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">{t.vehicle_number}</div>
+                    <div className="text-sm">Type: {t.vehicle_type}</div>
+                    <div className="text-sm">Capacity: {t.capacity_kg} kg</div>
+                    <div className="text-sm">Owner: {t.profiles?.full_name || 'Unknown'}</div>
+                  </div>
+                  <div className="text-sm">Status: <b>{t.active ? 'Active' : 'Inactive'}</b></div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant={t.active ? 'outline' : 'default'}
+                    size="sm"
+                    onClick={() => toggleActiveStatus(t.id, t.active)}
+                  >
+                    {t.active ? 'Deactivate' : 'Activate'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(t)}>
+                    <Pencil size={16} className="mr-2" /> Edit
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );

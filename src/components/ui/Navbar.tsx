@@ -52,6 +52,7 @@ export default function Navbar() {
           ? [
               { href: '/indents', label: 'Indents' },
               { href: '/clients', label: 'Clients' },
+              { href: '/trucks', label: 'Trucks' },
             ]
           : []),
         ...(userRole === 'truck_owner' ? [{ href: '/trucks', label: 'Trucks' }] : []),
