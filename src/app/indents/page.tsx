@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
-import { X } from 'lucide-react';
+import { X, Pencil } from 'lucide-react';
 
 export default function IndentsPage() {
   const [form, setForm] = useState({
@@ -28,7 +28,9 @@ export default function IndentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [editingIndentId, setEditingIndentId] = useState<string | null>(null);
   const router = useRouter();
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -183,6 +185,7 @@ export default function IndentsPage() {
         pickup_at: '',
         contact_phone: '',
       });
+      setEditingIndentId(null);
       console.log('Setting success message: Indent created successfully!');
       setSuccess('Indent created successfully!');
       // Auto-dismiss success message after 5 seconds
@@ -194,6 +197,132 @@ export default function IndentsPage() {
       console.error('Unexpected error creating indent:', err);
       setError('An unexpected error occurred while creating the indent.');
     }
+  };
+
+  const updateIndent = async () => {
+    try {
+      setError(null);
+      setSuccess(null);
+
+      // Validate form inputs
+      const validationError = validateForm();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      if (!editingIndentId) {
+        setError('No indent selected for editing.');
+        return;
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('No authenticated user:', userError?.message);
+        setError('You must be logged in to update an indent.');
+        router.push('/login');
+        return;
+      }
+
+      const payload: any = {
+        client_id: form.client_id,
+        origin: form.origin,
+        destination: form.destination,
+        vehicle_type: form.vehicle_type,
+        trip_cost: Number(form.trip_cost || 0),
+        tat_hours: Number(form.tat_hours || 0),
+        load_material: form.load_material,
+        load_weight_kg: form.load_weight_kg ? Number(form.load_weight_kg) : null,
+        pickup_at: form.pickup_at ? new Date(form.pickup_at).toISOString() : null,
+        contact_phone: form.contact_phone,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Update indent and fetch with admin's full_name and client name
+      const { data: indent, error: indentError } = await supabase
+        .from('indents')
+        .update(payload)
+        .eq('id', editingIndentId)
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+        .single();
+      if (indentError) {
+        console.error('Error updating indent:', indentError.message);
+        setError(`Failed to update indent: ${indentError.message}`);
+        return;
+      }
+
+      // Update indents state
+      setIndents(prev =>
+        prev.map(i => (i.id === editingIndentId ? indent : i))
+      );
+      setForm({
+        client_id: '',
+        origin: '',
+        destination: '',
+        vehicle_type: '',
+        trip_cost: '',
+        tat_hours: '',
+        load_material: '',
+        load_weight_kg: '',
+        pickup_at: '',
+        contact_phone: '',
+      });
+      setEditingIndentId(null);
+      console.log('Setting success message: Indent updated successfully!');
+      setSuccess('Indent updated successfully!');
+      // Auto-dismiss success message after 5 seconds
+      setTimeout(() => {
+        console.log('Clearing success message');
+        setSuccess(null);
+      }, 5000);
+    } catch (err) {
+      console.error('Unexpected error updating indent:', err);
+      setError('An unexpected error occurred while updating the indent.');
+    }
+  };
+
+  const handleEdit = (indent: any) => {
+    setForm({
+      client_id: indent.client_id || '',
+      origin: indent.origin || '',
+      destination: indent.destination || '',
+      vehicle_type: indent.vehicle_type || '',
+      trip_cost: indent.trip_cost?.toString() || '',
+      tat_hours: indent.tat_hours?.toString() || '',
+      load_material: indent.load_material || '',
+      load_weight_kg: indent.load_weight_kg?.toString() || '',
+      pickup_at: indent.pickup_at ? new Date(indent.pickup_at).toISOString().slice(0, 16) : '',
+      contact_phone: indent.contact_phone || '',
+    });
+    setEditingIndentId(indent.id);
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setForm({
+      client_id: '',
+      origin: '',
+      destination: '',
+      vehicle_type: '',
+      trip_cost: '',
+      tat_hours: '',
+      load_material: '',
+      load_weight_kg: '',
+      pickup_at: '',
+      contact_phone: '',
+    });
+    setEditingIndentId(null);
+  };
+
+  // Helper function to format status for display
+  const formatStatus = (status: string, remark: string) => {
+    if (status === 'open' && remark === 'Indent created') return 'Created';
+    return status
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const updateStatus = async (id: string, to_status: string) => {
@@ -267,15 +396,6 @@ export default function IndentsPage() {
     }
   };
 
-  // Helper function to format status for display
-  const formatStatus = (status: string, remark: string) => {
-    if (status === 'open' && remark === 'Indent created') return 'Created';
-    return status
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
   // Filter indents based on search query
   const filteredIndents = useMemo(() => {
     const s = q.toLowerCase();
@@ -304,9 +424,9 @@ export default function IndentsPage() {
             </button>
           </div>
         )}
-        {/* Create indent form */}
-        <Card className="p-4 space-y-3">
-          <h2 className="text-xl font-bold">Create Indent</h2>
+        {/* Create/Edit indent form */}
+        <Card className="p-4 space-y-3" ref={formRef}>
+          <h2 className="text-xl font-bold">{editingIndentId ? 'Editing Indent' : 'Create Indent'}</h2>
           <div className="grid md:grid-cols-3 gap-3">
             <div>
               <Label>Client</Label>
@@ -380,7 +500,16 @@ export default function IndentsPage() {
               />
             </div>
           </div>
-          <Button onClick={createIndent}>Post to Load Board</Button>
+          <div className="flex gap-2">
+            <Button onClick={editingIndentId ? updateIndent : createIndent}>
+              {editingIndentId ? 'Update Indent' : 'Post to Load Board'}
+            </Button>
+            {editingIndentId && (
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </Card>
 
         {/* My indents */}
@@ -430,6 +559,13 @@ export default function IndentsPage() {
                       {new Date(h.changed_at).toLocaleString()} — {formatStatus(h.to_status, h.remark)} by {h.profiles?.full_name || 'Unknown'}
                     </div>
                   ))}
+                </div>
+
+                {/* Edit button */}
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(i)}>
+                    <Pencil size={16} className="mr-2" /> Edit
+                  </Button>
                 </div>
               </Card>
             ))}
