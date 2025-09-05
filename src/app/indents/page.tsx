@@ -29,15 +29,40 @@ export default function IndentsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [editingIndentId, setEditingIndentId] = useState<string | null>(null);
-  const [statusFilters, setStatusFilters] = useState({
-    open: true,
-    assigned: true,
-    in_transit: true,
-    delivered: true,
-    cancelled: true,
+  const [statusFilters, setStatusFilters] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('indentStatusFilters');
+      return saved ? JSON.parse(saved) : {
+        open: true,
+        assigned: true,
+        in_transit: true,
+        delivered: true,
+        cancelled: true,
+      };
+    }
+    return {
+      open: true,
+      assigned: true,
+      in_transit: true,
+      delivered: true,
+      cancelled: true,
+    };
   });
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Set isClient to true after mount to ensure client-side rendering
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Save statusFilters to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('indentStatusFilters', JSON.stringify(statusFilters));
+    }
+  }, [statusFilters]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -538,18 +563,20 @@ export default function IndentsPage() {
               className="max-w-sm"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {['open', 'assigned', 'in_transit', 'delivered', 'cancelled'].map(status => (
-              <Button
-                key={status}
-                variant={statusFilters[status] ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => toggleStatusFilter(status)}
-              >
-                {formatStatus(status, '')}
-              </Button>
-            ))}
-          </div>
+          {isClient && (
+            <div className="flex flex-wrap gap-2">
+              {['open', 'assigned', 'in_transit', 'delivered', 'cancelled'].map(status => (
+                <Button
+                  key={status}
+                  variant={statusFilters[status] ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleStatusFilter(status)}
+                >
+                  {formatStatus(status, '')}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="grid md:grid-cols-2 gap-3">
             {filteredIndents.map(i => (
               <Card key={i.id} className="p-4 space-y-2">
