@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,7 @@ export default function IndentsPage() {
   const [history, setHistory] = useState<Record<string, any[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [q, setQ] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -58,10 +59,10 @@ export default function IndentsPage() {
       try {
         const { data: c } = await supabase.from('clients').select('id,name');
         setClients(c || []);
-        // Fetch indents with admin's full_name via join with profiles
+        // Fetch indents with admin's full_name and client name via joins
         const { data: i, error: indentError } = await supabase
           .from('indents')
-          .select('*, profiles!indents_created_by_fkey(full_name)')
+          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
           .order('created_at', { ascending: false });
         if (indentError) {
           console.error('Error fetching indents:', indentError.message);
@@ -136,11 +137,11 @@ export default function IndentsPage() {
         status: 'open',
       };
 
-      // Insert indent and fetch with admin's full_name
+      // Insert indent and fetch with admin's full_name and client name
       const { data: indent, error: indentError } = await supabase
         .from('indents')
         .insert(payload)
-        .select('*, profiles!indents_created_by_fkey(full_name)')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
         .single();
       if (indentError) {
         console.error('Error creating indent:', indentError.message);
@@ -266,6 +267,23 @@ export default function IndentsPage() {
     }
   };
 
+  // Helper function to format status for display
+  const formatStatus = (status: string, remark: string) => {
+    if (status === 'open' && remark === 'Indent created') return 'Created';
+    return status
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Filter indents based on search query
+  const filteredIndents = useMemo(() => {
+    const s = q.toLowerCase();
+    return indents.filter(i =>
+      [i.origin, i.destination, i.vehicle_type, i.clients?.name || ''].some(t => t.toLowerCase().includes(s))
+    );
+  }, [q, indents]);
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
@@ -367,13 +385,22 @@ export default function IndentsPage() {
 
         {/* My indents */}
         <section className="space-y-3">
-          <h2 className="text-xl font-bold">My Indents</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">My Indents ({filteredIndents.length})</h2>
+            <Input
+              placeholder="Search city / vehicle / client"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
           <div className="grid md:grid-cols-2 gap-3">
-            {indents.map(i => (
+            {filteredIndents.map(i => (
               <Card key={i.id} className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold">{i.origin} → {i.destination}</div>
+                    <div className="text-sm">Client: {i.clients?.name || 'Unknown Client'}</div>
                     <div className="text-sm">{i.vehicle_type} • Pickup {new Date(i.pickup_at).toLocaleString()}</div>
                   </div>
                   <div className="text-sm">Created by: <b>{i.profiles?.full_name || 'Unknown'}</b></div>
@@ -398,9 +425,9 @@ export default function IndentsPage() {
                 {/* Status history */}
                 <div className="mt-3 space-y-1 text-sm">
                   <b>Status History:</b>
-                  {(history[i.id] || []).map(h => (
-                    <div key={h.id} className="text-gray-600">
-                      {new Date(h.changed_at).toLocaleString()} — {h.to_status} by {h.profiles?.full_name || 'Unknown'} ({h.remark})
+                  {(history[i.id] || []).map((h, index) => (
+                    <div key={h.id} className={`text-gray-600 ${index === 0 ? 'font-bold' : ''}`}>
+                      {new Date(h.changed_at).toLocaleString()} — {formatStatus(h.to_status, h.remark)} by {h.profiles?.full_name || 'Unknown'}
                     </div>
                   ))}
                 </div>
