@@ -29,6 +29,13 @@ export default function IndentsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [editingIndentId, setEditingIndentId] = useState<string | null>(null);
+  const [statusFilters, setStatusFilters] = useState({
+    open: true,
+    assigned: true,
+    in_transit: true,
+    delivered: true,
+    cancelled: true,
+  });
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -316,6 +323,13 @@ export default function IndentsPage() {
     setEditingIndentId(null);
   };
 
+  const toggleStatusFilter = (status: string) => {
+    setStatusFilters(prev => ({
+      ...prev,
+      [status]: !prev[status],
+    }));
+  };
+
   // Helper function to format status for display
   const formatStatus = (status: string, remark: string) => {
     if (status === 'open' && remark === 'Indent created') return 'Created';
@@ -396,13 +410,14 @@ export default function IndentsPage() {
     }
   };
 
-  // Filter indents based on search query
+  // Filter indents based on search query and status filters
   const filteredIndents = useMemo(() => {
     const s = q.toLowerCase();
     return indents.filter(i =>
+      statusFilters[i.status] &&
       [i.origin, i.destination, i.vehicle_type, i.clients?.name || ''].some(t => t.toLowerCase().includes(s))
     );
-  }, [q, indents]);
+  }, [q, indents, statusFilters]);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -522,6 +537,18 @@ export default function IndentsPage() {
               onChange={e => setQ(e.target.value)}
               className="max-w-sm"
             />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {['open', 'assigned', 'in_transit', 'delivered', 'cancelled'].map(status => (
+              <Button
+                key={status}
+                variant={statusFilters[status] ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => toggleStatusFilter(status)}
+              >
+                {formatStatus(status, '')}
+              </Button>
+            ))}
           </div>
           <div className="grid md:grid-cols-2 gap-3">
             {filteredIndents.map(i => (
