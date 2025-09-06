@@ -8,16 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Navbar from '@/components/ui/Navbar';
-import { Mail, User, CreditCard, X, Lock } from 'lucide-react';
+import { User, CreditCard, Phone, X } from 'lucide-react';
 
 interface TruckOwnerForm {
-  email: string;
-  password: string;
   full_name: string;
+  phone: string;
   aadhaar_or_pan: string;
   bank_account_number: string;
   bank_ifsc_code: string;
   upi_id: string;
+  town_city: string;
 }
 
 export default function TruckOwnersPage() {
@@ -29,20 +29,22 @@ export default function TruckOwnersPage() {
   const returnTo = searchParams.get('returnTo') || '/trucks';
   const { register, handleSubmit, reset, formState: { errors } } = useForm<TruckOwnerForm>({
     defaultValues: {
-      email: '',
-      password: '',
       full_name: '',
+      phone: '',
       aadhaar_or_pan: '',
       bank_account_number: '',
       bank_ifsc_code: '',
       upi_id: '',
+      town_city: '',
     }
   });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Checking auth...'); // Debug log
         const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log('Auth response:', { user, userError }); // Debug log
         if (userError || !user) {
           console.error('Auth error or no user:', userError?.message);
           router.push('/login');
@@ -53,6 +55,7 @@ export default function TruckOwnersPage() {
           .select('role')
           .eq('id', user.id)
           .single();
+        console.log('Profile response:', { profile, profileError }); // Debug log
         if (profileError || profile?.role !== 'admin') {
           console.error('Profile fetch error:', profileError?.message, 'Role:', profile?.role);
           router.push('/');
@@ -70,12 +73,20 @@ export default function TruckOwnersPage() {
     setError(null);
     setSuccess(null);
     try {
+      console.log('Submitting data:', data); // Debug log
+      // Convert empty bank_ifsc_code to null to satisfy the check constraint
+      const processedData = {
+        ...data,
+        bank_ifsc_code: data.bank_ifsc_code.trim() === '' ? null : data.bank_ifsc_code,
+      };
       const response = await fetch('/api/truck-owners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(processedData),
       });
+      console.log('Fetch response status:', response.status); // Debug log
       const result = await response.json();
+      console.log('Fetch response data:', result); // Debug log
       if (!response.ok) {
         throw new Error(result.error || 'Failed to add truck owner');
       }
@@ -124,47 +135,35 @@ export default function TruckOwnersPage() {
             <form onSubmit={handleSubmit(handleAddTruckOwner)} className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="owner@example.com"
-                      className="pl-10"
-                      {...register('email', { required: 'Email is required' })}
-                    />
-                    {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="********"
-                      className="pl-10"
-                      {...register('password', {
-                        required: 'Password is required',
-                        minLength: { value: 6, message: 'Password must be at least 6 characters' },
-                      })}
-                    />
-                    {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="full_name">Name *</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <Input
                       id="full_name"
-                      placeholder="John Doe"
+                      placeholder="Vaibhav S"
                       className="pl-10"
                       {...register('full_name', { required: 'Name is required' })}
                     />
                     {errors.full_name && <p className="text-red-500 text-sm">{errors.full_name.message}</p>}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Input
+                      id="phone"
+                      placeholder="+91 9876543210"
+                      className="pl-10"
+                      {...register('phone', {
+                        required: 'Phone is required',
+                        pattern: {
+                          value: /^\+?[1-9]\d{9,14}$/,
+                          message: 'Enter a valid phone number (e.g., +919876543210)',
+                        },
+                      })}
+                    />
+                    {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -184,6 +183,18 @@ export default function TruckOwnersPage() {
                       })}
                     />
                     {errors.aadhaar_or_pan && <p className="text-red-500 text-sm">{errors.aadhaar_or_pan.message}</p>}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="town_city">Town/City</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Input
+                      id="town_city"
+                      placeholder="Kolar"
+                      className="pl-10"
+                      {...register('town_city')}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -209,7 +220,7 @@ export default function TruckOwnersPage() {
                       {...register('bank_ifsc_code', {
                         pattern: {
                           value: /^[A-Z]{4}0[A-Z0-9]{6}$/,
-                          message: 'Enter a valid IFSC code',
+                          message: 'Enter a valid IFSC code (e.g., SBIN0001234)',
                         },
                       })}
                     />
@@ -222,7 +233,7 @@ export default function TruckOwnersPage() {
                     <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <Input
                       id="upi_id"
-                      placeholder="user@upi"
+                      placeholder="vaibhav@upi"
                       className="pl-10"
                       {...register('upi_id')}
                     />

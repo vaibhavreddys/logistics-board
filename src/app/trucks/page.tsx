@@ -85,7 +85,7 @@ export default function TrucksPage() {
   const validateForm = () => {
     if (!form.owner_id) return 'Please select a truck owner.';
     if (!form.vehicle_number || !/^[A-Z0-9-]+$/.test(form.vehicle_number)) return 'Please enter a valid vehicle number (alphanumeric with hyphens).';
-    if (!form.vehicle_type) return 'Please enter a vehicle type.';
+    if (!form.vehicle_type) return 'Please select a vehicle type.';
     if (!form.capacity_kg || Number(form.capacity_kg) <= 0) return 'Please enter a valid capacity (kg).';
     return null;
   };
@@ -328,10 +328,23 @@ export default function TrucksPage() {
             </div>
             <div>
               <Label>Vehicle Type</Label>
-              <Input
+              <select
+                className="w-full border rounded p-2"
                 value={form.vehicle_type}
                 onChange={e => setForm({ ...form, vehicle_type: e.target.value })}
-              />
+              >
+                <option value="">Select vehicle type</option>
+                <option value="32 ft MXL (Multi Axle)">32 ft MXL (Multi Axle)</option>
+                <option value="32 ft SXL (Single Axle)">32 ft SXL (Single Axle)</option>
+                <option value="24 ft Truck">24 ft Truck</option>
+                <option value="20 ft Truck">20 ft Truck</option>
+                <option value="22 ft Truck">22 ft Truck</option>
+                <option value="17 ft Truck">17 ft Truck</option>
+                <option value="14 ft Truck">14 ft Truck</option>
+                <option value="10 ft Truck / Tata 407">10 ft Truck / Tata 407</option>
+                <option value="8 ft Pickup (Bolero / Pickup)">8 ft Pickup (Bolero / Pickup)</option>
+                <option value="7 ft Tata Ace">7 ft Tata Ace</option>
+              </select>
             </div>
             <div>
               <Label>Capacity (kg)</Label>
@@ -382,7 +395,11 @@ export default function TrucksPage() {
                     <div className="font-semibold">{t.vehicle_number}</div>
                     <div className="text-sm">Type: {t.vehicle_type}</div>
                     <div className="text-sm">Capacity: {t.capacity_kg} kg</div>
-                    <div className="text-sm">Owner: {t.profiles?.full_name || 'Unknown'}</div>
+                    <div className="text-sm">
+                      Owner: <Link href={`/truck-owners/view/${t.owner_id}`} className="text-blue-600 hover:underline">
+                        {t.profiles?.full_name || 'Unknown'}
+                      </Link>
+                    </div>
                   </div>
                   <div className="text-sm">Status: <b>{t.active ? 'Active' : 'Inactive'}</b></div>
                 </div>

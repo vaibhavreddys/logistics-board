@@ -1,84 +1,49 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { NextResponse } from 'next/server';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { v4 as uuidv4 } from 'uuid'; // Import UUID generator
 
 export async function POST(request: Request) {
+  const data = await request.json();
+  const { full_name, phone, aadhaar_or_pan, bank_account_number, bank_ifsc_code, upi_id, town_city } = data;
+
   try {
-    const {
-      email,
-      password,
-      full_name,
-      aadhaar_or_pan,
-      bank_account_number,
-      bank_ifsc_code,
-      upi_id,
-    } = await request.json();
+    // Generate a new UUID for the profile and user
+    const userId = uuidv4();
 
-    // Validate required fields
-    if (!email || !password || !full_name || !aadhaar_or_pan) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Create user with service role
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email
+    // Create a new user via Supabase Auth (simulating email/password creation)
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
+      email: `${userId}@example.com`, // Temporary email (update as needed)
+      password: uuidv4(), // Temporary password (update as needed)
+      user_metadata: { full_name, phone },
+      email_confirm: true, // Auto-confirm for simplicity (adjust for production)
     });
+    if (userError) throw userError;
 
-    if (authError || !authData.user) {
-      return NextResponse.json(
-        { error: authError?.message || 'Failed to create user' },
-        { status: 400 }
-      );
-    }
+    // Create profile
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({ id: userData.user.id, full_name, phone })
+      .select('id')
+      .single();
+    if (profileError) throw profileError;
 
-    // Insert into profiles
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: authData.user.id,
-      full_name,
-      role: 'truck_owner',
-    });
-    if (profileError) {
-      // Rollback user creation
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json(
-        { error: profileError.message || 'Failed to create profile' },
-        { status: 400 }
-      );
-    }
+    // Create truck_owner
+    const { data: truckOwnerData, error: truckOwnerError } = await supabaseAdmin
+      .from('truck_owners')
+      .insert({
+        profile_id: profileData.id,
+        aadhaar_or_pan,
+        bank_account_number,
+        bank_ifsc_code,
+        upi_id,
+        town_city,
+      })
+      .select('id');
+    if (truckOwnerError) throw truckOwnerError;
 
-    // Insert into truck_owners
-    const { error: truckOwnerError } = await supabase.from('truck_owners').insert({
-      profile_id: authData.user.id,
-      aadhaar_or_pan,
-      bank_account_number: bank_account_number || null,
-      bank_ifsc_code: bank_ifsc_code || null,
-      upi_id: upi_id || null,
-    });
-    if (truckOwnerError) {
-      // Rollback user and profile
-      await supabase.from('profiles').delete().eq('id', authData.user.id);
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json(
-        { error: truckOwnerError.message || 'Failed to create truck owner' },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({ userId: authData.user.id }, { status: 200 });
+    return NextResponse.json({ userId: profileData.id });
   } catch (err: any) {
-    console.error('Error in POST /api/truck-owners:', err);
-    return NextResponse.json(
-      { error: err.message || 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error in POST /api/truck-owners:', err); // Added logging
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
