@@ -32,7 +32,7 @@ export default function TrucksPage() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
-          console.error('Auth error or no user:', userError?.message);
+          console.log('Auth error or no user:', userError?.message);
           router.push('/login');
           return;
         }

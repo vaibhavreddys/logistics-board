@@ -32,19 +32,19 @@ export default function Navbar() {
   }, []);
 
   const handleLogin = () => {
-    router.push('/login');
     setIsMenuOpen(false);
+    router.push('/login');
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setUserRole(null);
-    router.push('/');
     setIsMenuOpen(false);
+    router.push('/');
   };
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const toggleMenu = () => setIsMenuOpen(prev => !prev);
 
   const navLinks = isLoggedIn
     ? [
@@ -53,7 +53,7 @@ export default function Navbar() {
               { href: '/indents', label: 'Indents' },
               { href: '/clients', label: 'Clients' },
               { href: '/trucks', label: 'Trucks' },
-              // { href: '/truck-owners/view', label: 'Truck Owners' },
+              { href: '/trips', label: 'Trips' },
             ]
           : []),
         ...(userRole === 'truck_owner' ? [{ href: '/trucks', label: 'Trucks' }] : []),
@@ -61,10 +61,18 @@ export default function Navbar() {
       ]
     : [];
 
+  const onNavigate = (href: string, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setIsMenuOpen(false);
+    router.push(href);
+  };
+
   return (
     <nav className="bg-gradient-to-r from-blue-600 to-purple-700 text-white shadow-lg p-4">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <div className="text-2xl font-bold tracking-wide">Freight 24</div>
+
+        {/* Hamburger for mobile */}
         <div className="md:hidden">
           <button
             onClick={toggleMenu}
@@ -74,8 +82,10 @@ export default function Navbar() {
             {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
           </button>
         </div>
-        <div className={`md:flex items-center gap-6 ${isMenuOpen ? 'block' : 'hidden'} md:block`}>
-          <ul className="flex flex-col md:flex-row gap-6">
+
+        {/* Desktop links - visible only on md+ */}
+        <div className="hidden md:flex items-center gap-6">
+          <ul className="flex gap-6">
             {navLinks.map(link => (
               <li key={link.href}>
                 {pathname === link.href ? (
@@ -86,11 +96,7 @@ export default function Navbar() {
                   <a
                     href={link.href}
                     className="text-white hover:text-yellow-300 text-lg transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      router.push(link.href);
-                      setIsMenuOpen(false);
-                    }}
+                    onClick={(e) => onNavigate(link.href, e)}
                   >
                     {link.label}
                   </a>
@@ -98,25 +104,27 @@ export default function Navbar() {
               </li>
             ))}
           </ul>
+
           {isLoggedIn ? (
             <Button
-              variant="outline"
-              className="mt-4 md:mt-0 md:ml-6 border-white text-black hover:bg-white hover:text-purple-700"
+              className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
               onClick={handleLogout}
             >
               Logout
             </Button>
           ) : (
             <Button
-              variant="outline"
-              className="mt-4 md:mt-0 md:ml-6 border-white text-black hover:bg-white hover:text-purple-700"
+              className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
               onClick={handleLogin}
             >
               Login
             </Button>
           )}
+
         </div>
       </div>
+
+      {/* Mobile dropdown - only shown when hamburger toggled */}
       {isMenuOpen && (
         <div className="md:hidden mt-4 bg-gray-800 bg-opacity-90 p-4 rounded-lg">
           <ul className="flex flex-col gap-4">
@@ -130,11 +138,7 @@ export default function Navbar() {
                   <a
                     href={link.href}
                     className="block text-white hover:text-yellow-300 p-2"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      router.push(link.href);
-                      setIsMenuOpen(false);
-                    }}
+                    onClick={(e) => onNavigate(link.href, e)}
                   >
                     {link.label}
                   </a>
@@ -145,7 +149,7 @@ export default function Navbar() {
               {isLoggedIn ? (
                 <Button
                   variant="outline"
-                  className="w-full border-white text-white hover:bg-white hover:text-purple-700"
+                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
                   onClick={handleLogout}
                 >
                   Logout
@@ -153,7 +157,7 @@ export default function Navbar() {
               ) : (
                 <Button
                   variant="outline"
-                  className="w-full border-white text-white hover:bg-white hover:text-purple-700"
+                  className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
                   onClick={handleLogin}
                 >
                   Login

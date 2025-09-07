@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Truck } from 'lucide-react';
 
 interface LoginForm {
   email: string;
@@ -72,44 +72,30 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md shadow-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold">
-            {mode === 'login' && 'Login'}
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-orange-50">
+      <Card className="w-full max-w-md p-6 bg-white shadow-lg rounded-xl border border-gray-200">
+        <CardHeader className="text-center space-y-4">
+          <Truck className="mx-auto text-blue-600" size={48} />
+          <CardTitle className="text-3xl font-bold text-gray-800">
+            {mode === 'login' && 'Freight24 Login'}
             {mode === 'forgot' && 'Forgot Password'}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-center gap-4 mb-4">
-            <Button
-              variant={mode === 'login' ? 'default' : 'outline'}
-              onClick={() => setMode('login')}
-            >
-              Login
-            </Button>
-            <Button
-              variant={mode === 'forgot' ? 'default' : 'outline'}
-              onClick={() => setMode('forgot')}
-            >
-              Forgot Password
-            </Button>
-          </div>
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-          {success && <p className="text-green-500 text-sm">{success}</p>}
+        <CardContent className="space-y-6">
+          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          {success && <p className="text-green-500 text-sm text-center">{success}</p>}
 
           {mode === 'login' && (
-            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
+            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
+              <div className="space-y-3">
+                <Label htmlFor="login-email" className="text-gray-700">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
                     id="login-email"
                     type="email"
                     placeholder="your@email.com"
-                    className="pl-10"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     {...loginForm.register('email', { required: 'Email is required' })}
                   />
                   {loginForm.formState.errors.email && (
@@ -117,15 +103,15 @@ export default function AuthPage() {
                   )}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
+              <div className="space-y-3">
+                <Label htmlFor="login-password" className="text-gray-700">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
                     id="login-password"
                     type="password"
                     placeholder="********"
-                    className="pl-10"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     {...loginForm.register('password', { required: 'Password is required' })}
                   />
                   {loginForm.formState.errors.password && (
@@ -135,46 +121,57 @@ export default function AuthPage() {
               </div>
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 disabled={loading || !loginForm.watch('email') || !loginForm.watch('password')}
               >
                 {loading ? 'Logging in...' : 'Login'}
               </Button>
+              <p className="text-center text-sm text-gray-600">
+                <button
+                  className="text-blue-600 hover:underline"
+                  onClick={() => setMode('forgot')}
+                >
+                  Forgot Password?
+                </button>
+              </p>
             </form>
           )}
 
           {mode === 'forgot' && (
-            <form onSubmit={forgotForm.handleSubmit(handleForgotPassword)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="forgot-email">Email</Label>
+            <form onSubmit={forgotForm.handleSubmit(handleForgotPassword)} className="space-y-5">
+              <div className="space-y-3">
+                <Label htmlFor="forgot-email" className="text-gray-700">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
                     id="forgot-email"
                     type="email"
                     placeholder="your@email.com"
-                    className="pl-10"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     {...forgotForm.register('email', { required: 'Email is required' })}
                   />
-                  {loginForm.formState.errors.email && (
-                    <p className="text-red-500 text-sm">{loginForm.formState.errors.email.message}</p>
+                  {forgotForm.formState.errors.email && (
+                    <p className="text-red-500 text-sm">{forgotForm.formState.errors.email.message}</p>
                   )}
                 </div>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={loading}
+              >
                 {loading ? 'Sending...' : 'Send Reset Link'}
               </Button>
+              <p className="text-center text-sm text-gray-600">
+                <button
+                  className="text-blue-600 hover:underline"
+                  onClick={() => setMode('login')}
+                >
+                  Back to Login
+                </button>
+              </p>
             </form>
           )}
-
-          <p className="text-center text-sm text-gray-600">
-            <button
-              className="text-blue-600 hover:underline"
-              onClick={() => setMode('forgot')}
-            >
-              Forgot Password?
-            </button>
-          </p>
         </CardContent>
       </Card>
     </div>

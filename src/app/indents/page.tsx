@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
-import { X, Pencil, History, Truck, Package, Phone, Calendar, Handshake, MessageSquareText } from 'lucide-react';
+import { X, Pencil, History, Truck, Package, Phone, Calendar, Handshake, MessageSquareText, User, Edit } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ export default function IndentsPage() {
     destination: '',
     vehicle_type: '',
     trip_cost: '',
+    client_cost: '',
     tat_hours: '',
     load_material: '',
     load_weight_kg: '',
@@ -32,6 +33,7 @@ export default function IndentsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [indents, setIndents] = useState<any[]>([]);
   const [history, setHistory] = useState<Record<string, any[]>>({});
+  const [trucks, setTrucks] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -41,33 +43,27 @@ export default function IndentsPage() {
       const saved = localStorage.getItem('indentStatusFilters');
       return saved ? JSON.parse(saved) : {
         open: true,
-        confirmed: true,
-        vehicle_placed: true,
-        completed: true,
-        pending: true,
+        accepted: true,
         cancelled: true,
-        failed: true,
       };
     }
     return {
       open: true,
-      confirmed: true,
-      vehicle_placed: true,
-      completed: true,
-      pending: true,
+      accepted: true,
       cancelled: true,
-      failed: true,
     };
   });
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
   const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [comments, setComments] = useState('');
+  const [isNewStatusSelected, setIsNewStatusSelected] = useState(false);
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +82,7 @@ export default function IndentsPage() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
-          console.error('Auth error or no user:', userError?.message);
+          console.log('Auth error or no user:', userError?.message);
           router.push('/login');
           return;
         }
@@ -112,7 +108,7 @@ export default function IndentsPage() {
         setClients(c || []);
         const { data: i, error: indentError } = await supabase
           .from('indents')
-          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
           .order('created_at', { ascending: false });
         if (indentError) {
           console.error('Error fetching indents:', indentError.message);
@@ -120,6 +116,17 @@ export default function IndentsPage() {
           return;
         }
         setIndents(i || []);
+        const { data: t, error: truckError } = await supabase
+          .from('trucks')
+          .select('vehicle_number')
+          .eq('active', true)
+          .order('vehicle_number', { ascending: true });
+        if (truckError) {
+          console.error('Error fetching trucks:', truckError.message);
+          setError('Failed to load trucks.');
+          return;
+        }
+        setTrucks(t || []);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please try again.');
@@ -134,7 +141,26 @@ export default function IndentsPage() {
     if (!form.vehicle_type) return 'Please select a vehicle type.';
     if (!form.pickup_at) return 'Please select a placement date and time.';
     if (!form.contact_phone || !/^\d{10}$/.test(form.contact_phone)) return 'Please enter a valid 10-digit contact phone number.';
+    if (!form.client_cost && !form.trip_cost) return 'Please enter either Client Cost or Trip Cost.';
     return null;
+  };
+
+  const generateShortId = async (origin: string, destination: string) => {
+    const prefix = `${origin.charAt(0)}${destination.charAt(0)}`.toUpperCase();
+    const { data: existingIndents, error: countError } = await supabase
+      .from('indents')
+      .select('short_id')
+      .ilike('short_id', `${prefix}%`);
+    if (countError) {
+      console.error('Error counting existing indents:', countError.message);
+      return `${prefix}0001`; // Fallback to 0001 if count fails
+    }
+    const maxNumber = existingIndents.reduce((max, indent) => {
+      const num = parseInt(indent.short_id?.slice(2) || '0');
+      return num > max ? num : max;
+    }, 0);
+    const nextNumber = String(maxNumber + 1).padStart(4, '0');
+    return `${prefix}${nextNumber}`;
   };
 
   const createIndent = async () => {
@@ -157,20 +183,23 @@ export default function IndentsPage() {
         return;
       }
 
+      const shortId = await generateShortId(form.origin, form.destination);
       const payload: any = {
         ...form,
         created_by: user.id,
         trip_cost: Number(form.trip_cost || 0),
+        client_cost: Number(form.client_cost || 0),
         tat_hours: Number(form.tat_hours || 0),
         load_weight_kg: form.load_weight_kg ? Number(form.load_weight_kg) : null,
         pickup_at: form.pickup_at ? new Date(form.pickup_at).toISOString() : null,
         status: 'open',
+        short_id: shortId, // Add short_id to payload
       };
 
       const { data: indent, error: indentError } = await supabase
         .from('indents')
         .insert(payload)
-        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
         .single();
       if (indentError) {
         console.error('Error creating indent:', indentError.message);
@@ -204,6 +233,7 @@ export default function IndentsPage() {
         destination: '',
         vehicle_type: '',
         trip_cost: '',
+        client_cost: '',
         tat_hours: '',
         load_material: '',
         load_weight_kg: '',
@@ -252,6 +282,7 @@ export default function IndentsPage() {
         destination: form.destination,
         vehicle_type: form.vehicle_type,
         trip_cost: Number(form.trip_cost || 0),
+        client_cost: Number(form.client_cost || 0),
         tat_hours: Number(form.tat_hours || 0),
         load_material: form.load_material,
         load_weight_kg: form.load_weight_kg ? Number(form.load_weight_kg) : null,
@@ -264,7 +295,7 @@ export default function IndentsPage() {
         .from('indents')
         .update(payload)
         .eq('id', editingIndentId)
-        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
         .single();
       if (indentError) {
         console.error('Error updating indent:', indentError.message);
@@ -279,6 +310,7 @@ export default function IndentsPage() {
         destination: '',
         vehicle_type: '',
         trip_cost: '',
+        client_cost: '',
         tat_hours: '',
         load_material: '',
         load_weight_kg: '',
@@ -303,6 +335,7 @@ export default function IndentsPage() {
       destination: indent.destination || '',
       vehicle_type: indent.vehicle_type || '',
       trip_cost: indent.trip_cost?.toString() || '',
+      client_cost: indent.client_cost?.toString() || '',
       tat_hours: indent.tat_hours?.toString() || '',
       load_material: indent.load_material || '',
       load_weight_kg: indent.load_weight_kg?.toString() || '',
@@ -320,6 +353,7 @@ export default function IndentsPage() {
       destination: '',
       vehicle_type: '',
       trip_cost: '',
+      client_cost: '',
       tat_hours: '',
       load_material: '',
       load_weight_kg: '',
@@ -335,25 +369,7 @@ export default function IndentsPage() {
 
   const formatStatus = (status: string, remark: string) => {
     if (status === 'open' && remark === 'Indent created') return 'Created';
-    return status
-      .split(/(?=[A-Z])|_/)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-  };
-
-  const validateStatusUpdate = () => {
-    if (!newStatus) return 'Please select a status.';
-    if (['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus)) {
-      if (!vehicleNumber) return 'Please enter a vehicle number.';
-      const normalizedVehicleNumber = vehicleNumber.toUpperCase();
-      if (!/^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}$/.test(normalizedVehicleNumber)) {
-        return 'Please enter a valid Indian vehicle number (e.g., KA01AB1234).';
-      }
-      if (!driverPhone || !/^\d{10}$/.test(driverPhone)) {
-        return 'Please enter a valid 10-digit driver phone number.';
-      }
-    }
-    return null;
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const updateStatus = async () => {
@@ -390,9 +406,21 @@ export default function IndentsPage() {
         status: newStatus,
         updated_at: new Date().toISOString(),
       };
-      if (['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus)) {
-        payload.vehicle_number = vehicleNumber.toUpperCase();
+      if (newStatus === 'accepted' && vehicleNumber && driverPhone) {
+        payload.vehicle_number = vehicleNumber;
         payload.driver_phone = driverPhone;
+        // Create trip with client_cost and short_id
+        const { data: trip, error: tripError } = await supabase
+          .from('trips')
+          .insert({ indent_id: selectedIndentId, client_cost: currentIndent.client_cost, short_id: currentIndent.short_id })
+          .select('id')
+          .single();
+        if (tripError) {
+          console.error('Error creating trip:', tripError.message);
+          setError(`Failed to create trip: ${tripError.message}`);
+          return;
+        }
+        payload.trip_id = trip.id;
       }
       if (comments) {
         payload.notes = comments;
@@ -435,7 +463,7 @@ export default function IndentsPage() {
 
       const { data: updatedIndent } = await supabase
         .from('indents')
-        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
         .eq('id', selectedIndentId)
         .single();
 
@@ -448,9 +476,61 @@ export default function IndentsPage() {
       setVehicleNumber('');
       setDriverPhone('');
       setComments('');
+      setIsNewStatusSelected(false);
     } catch (err) {
       console.error('Error updating status:', err);
       setError('Failed to update indent status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateComments = async () => {
+    setLoading(true);
+    try {
+      setError(null);
+      setSuccess(null);
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('No authenticated user:', userError?.message);
+        setError('You must be logged in to update comments.');
+        return;
+      }
+
+      const currentIndent = indents.find(i => i.id === selectedIndentId);
+      if (!currentIndent) {
+        console.error('Indent not found:', selectedIndentId);
+        setError('Indent not found.');
+        return;
+      }
+
+      const payload: any = {
+        notes: comments,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase.from('indents').update(payload).eq('id', selectedIndentId);
+      if (updateError) {
+        console.error('Error updating comments:', updateError.message);
+        setError(`Failed to update comments: ${updateError.message}`);
+        return;
+      }
+
+      const { data: updatedIndent } = await supabase
+        .from('indents')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
+        .eq('id', selectedIndentId)
+        .single();
+
+      setIndents(prev => prev.map(i => i.id === selectedIndentId ? updatedIndent : i));
+      setSuccess('Comments updated successfully!');
+      setTimeout(() => setSuccess(null), 5000);
+      setCommentsModalOpen(false);
+      setComments('');
+    } catch (err) {
+      console.error('Error updating comments:', err);
+      setError('Failed to update comments. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -487,6 +567,20 @@ export default function IndentsPage() {
       [i.origin, i.destination, i.vehicle_type, i.clients?.name || ''].some(t => t.toLowerCase().includes(s))
     );
   }, [q, indents, statusFilters]);
+
+  const validateStatusUpdate = () => {
+    if (!newStatus) return 'Please select a status.';
+    if (newStatus === 'accepted') {
+      if (!vehicleNumber) return 'Please select a vehicle number.';
+      if (!trucks.some(t => t.vehicle_number === vehicleNumber)) {
+        return 'Selected vehicle number is not available.';
+      }
+      if (!driverPhone || !/^\d{10}$/.test(driverPhone)) {
+        return 'Please enter a valid 10-digit driver phone number.';
+      }
+    }
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -575,6 +669,14 @@ export default function IndentsPage() {
               />
             </div>
             <div>
+              <Label>Client Cost (₹)</Label>
+              <Input
+                type="number"
+                value={form.client_cost}
+                onChange={e => setForm({ ...form, client_cost: e.target.value })}
+              />
+            </div>
+            <div>
               <Label>TAT (hours)</Label>
               <Input
                 type="number"
@@ -623,7 +725,7 @@ export default function IndentsPage() {
           </div>
           {isClient && (
             <div className="flex flex-wrap gap-2">
-              {['open', 'confirmed', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
+              {['open', 'accepted', 'cancelled'].map(status => (
                 <Button
                   key={status}
                   variant={statusFilters[status] ? 'default' : 'outline'}
@@ -637,62 +739,150 @@ export default function IndentsPage() {
           )}
           <div className="grid md:grid-cols-2 gap-3">
             {filteredIndents.map(i => (
-              <Card key={i.id} className="p-4 space-y-6 bg-white shadow-md hover:shadow-lg transition-shadow">
-                <div className="space-y-2">
-                  <div className="font-semibold text-lg text-gray-800">{i.origin} ⮕ {i.destination}</div>
-                  {(i.vehicle_number || i.vehicle_type) && (
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Truck size={16} className="mr-2 text-gray-400" />
-                      <span>Vehicle : {i.vehicle_number} {i.vehicle_type}</span>
-                    </div>
-                  )}
-                  {(i.load_weight_kg || i.load_material) && (
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Package size={16} className="mr-2 text-gray-400" />
-                      <span>Load : {i.load_weight_kg} MT {i?.load_material}</span>
-                    </div>
-                  )}
-                  {i.driver_phone && (
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Phone size={16} className="mr-2 text-gray-400" />
-                      <span>Driver Phone : {i.driver_phone}</span>
-                    </div>
-                  )}
-                  {i.pickup_at && (
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Calendar size={16} className="mr-2 text-gray-400" />
-                      <span>Placement At : {new Date(i.pickup_at).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {i.clients?.name && (
-                    <div className="text-sm text-gray-600 flex items-center">
-                      <Handshake size={16} className="mr-2 text-gray-400" />
-                      <span>Client : {i.clients.name}</span>
-                    </div>
-                  )}
-                  <div className="text-sm text-gray-600 flex items-center">
-                    <MessageSquareText size={16} className="mr-2 text-gray-400" />
-                    <span>Comments : {i.notes}</span>
+              <Card
+                key={i.id}
+                className="p-4 bg-white shadow-md hover:shadow-lg transition-shadow flex flex-col h-full">
+                <div className="space-y-2 flex-grow">
+                  {/* Title with Short ID */}
+                  <div className="font-semibold text-lg text-gray-800">
+                    {i.origin} ⮕ {i.destination} <span className="text-sm text-gray-500">(ID: {i.short_id})</span>
                   </div>
+
+                  {/* Key-Value rows */}
+                  <div className="border rounded-lg divide-y text-sm overflow-hidden">
+                    {(i.vehicle_number || i.vehicle_type) && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Truck size={16} className="mr-2 text-gray-400" />
+                          Vehicle
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          {i.vehicle_number} {i.vehicle_type}
+                        </div>
+                      </div>
+                    )}
+
+                    {(i.load_weight_kg || i.load_material) && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Package size={16} className="mr-2 text-gray-400" />
+                          Load
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          {i.load_weight_kg} MT {i?.load_material}
+                        </div>
+                      </div>
+                    )}
+
+                    {i.driver_phone && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Phone size={16} className="mr-2 text-gray-400" />
+                          Driver Phone
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          {i.driver_phone}
+                        </div>
+                      </div>
+                    )}
+
+                    {i.pickup_at && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Calendar size={16} className="mr-2 text-gray-400" />
+                          Placement At
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          {new Date(i.pickup_at).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+
+                    {i.clients?.name && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <User size={16} className="mr-2 text-gray-400" />
+                          Client
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          {i.clients.name}
+                        </div>
+                      </div>
+                    )}
+
+                    {i.trip_cost > 0 && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Handshake size={16} className="mr-2 text-gray-400" />
+                          Trip Cost
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          ₹{i.trip_cost}
+                        </div>
+                      </div>
+                    )}
+
+                    {i.client_cost > 0 && (
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2 px-3 py-2 hover:bg-gray-50 transition-colors items-center">
+                        <div className="flex items-center text-gray-600 font-medium">
+                          <Handshake size={16} className="mr-2 text-gray-400" />
+                          Client Cost
+                        </div>
+                        <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
+                          ₹{i.client_cost}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Full-width Comments row with edit icon */}
+                  {i.notes && (
+                    <div className="border rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start text-gray-600 font-small mb-1">
+                        <MessageSquareText size={16} className="mr-2 mt-1 text-gray-400" />
+                        Comments
+                        <button
+                          onClick={() => {
+                            setSelectedIndentId(i.id);
+                            setComments(i.notes || "");
+                            setCommentsModalOpen(true);
+                          }}
+                          className="ml-2 mt-1 text-yellow-600 hover:text-yellow-800 focus:outline-none"
+                          disabled={loading}
+                        >
+                          <Edit size={16} />
+                        </button>
+                      </div>
+                      <div className="text-gray-800 font-semibold break-words whitespace-pre-wrap">
+                        {i.notes}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-end">
+
+                {/* Buttons + Status fixed at bottom */}
+                <div className="mt-auto pt-4 flex justify-between items-end">
                   <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                      onClick={() => {
-                        setSelectedIndentId(i.id);
-                        setNewStatus(i.status);
-                        setVehicleNumber(i.vehicle_number || '');
-                        setDriverPhone(i.driver_phone || '');
-                        setComments(i.notes || '');
-                        setStatusModalOpen(true);
-                      }}
-                      disabled={loading}
-                    >
-                      <span className="flex items-center"><span className="hidden sm:inline">Update</span> Status</span>
-                    </Button>
+                    {i.status !== 'accepted' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                        onClick={() => {
+                          setSelectedIndentId(i.id);
+                          setNewStatus(i.status);
+                          setVehicleNumber(i.vehicle_number || "");
+                          setDriverPhone(i.driver_phone || "");
+                          setComments(i.notes || "");
+                          setStatusModalOpen(true);
+                          setIsNewStatusSelected(false);
+                        }}
+                      >
+                        <span className="flex items-center">
+                          <span className="hidden sm:inline">Update</span> Status
+                        </span>
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -700,19 +890,27 @@ export default function IndentsPage() {
                       onClick={() => fetchHistory(i.id)}
                       disabled={loading}
                     >
-                      <span className="flex items-center"><History size={16} className="mr-1" /><span className="hidden sm:inline">View</span> History</span>
+                      <span className="flex items-center">
+                        <History size={16} className="mr-1" />
+                        <span className="hidden sm:inline">View</span> History
+                      </span>
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-purple-600 border-purple-600 hover:bg-purple-50"
-                      onClick={() => handleEdit(i)}
-                    >
-                      <span className="flex items-center"><Pencil size={16} className="mr-1" /><span className="hidden sm:inline">Edit</span></span>
-                    </Button>
+                    {i.status !== 'accepted' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-purple-600 border-purple-600 hover:bg-purple-50"
+                        onClick={() => handleEdit(i)}
+                      >
+                        <span className="flex items-center">
+                          <Pencil size={16} className="mr-1" />
+                          <span className="hidden sm:inline">Edit</span>
+                        </span>
+                      </Button>
+                    )}
                   </div>
                   <span className="px-2 py-0.5 bg-blue-200 text-blue-900 rounded-lg text-lg font-semibold shadow-md">
-                    {formatStatus(i.status, '')}
+                    {formatStatus(i.status, "")}
                   </span>
                 </div>
               </Card>
@@ -731,25 +929,38 @@ export default function IndentsPage() {
                 <select
                   className="w-full border rounded p-2"
                   value={newStatus}
-                  onChange={e => setNewStatus(e.target.value)}
+                  onChange={(e) => {
+                    setNewStatus(e.target.value);
+                    setVehicleNumber('');
+                    setDriverPhone('');
+                    setIsNewStatusSelected(e.target.value !== (indents.find(i => i.id === selectedIndentId)?.status || ''));
+                  }}
                   disabled={loading}
                 >
-                  {['open', 'confirmed', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
+                  {['open', 'accepted', 'cancelled'].map(status => (
                     <option key={status} value={status} disabled={indents.find(i => i.id === selectedIndentId)?.status === status}>
                       {formatStatus(status, '')}
                     </option>
                   ))}
                 </select>
               </div>
-              {['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus) && (
+              {newStatus === 'accepted' && (
                 <>
                   <div>
                     <Label>Vehicle Number</Label>
-                    <Input
+                    <select
+                      className="w-full border rounded p-2"
                       value={vehicleNumber}
                       onChange={e => setVehicleNumber(e.target.value)}
                       disabled={loading}
-                    />
+                    >
+                      <option value="">Select vehicle number</option>
+                      {trucks.map(t => (
+                        <option key={t.vehicle_number} value={t.vehicle_number}>
+                          {t.vehicle_number}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label>Driver Phone</Label>
@@ -767,7 +978,7 @@ export default function IndentsPage() {
                 <Input
                   value={comments}
                   onChange={e => setComments(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || !isNewStatusSelected}
                   placeholder="Add any comments..."
                 />
               </div>
@@ -777,8 +988,36 @@ export default function IndentsPage() {
               <Button variant="outline" onClick={() => { setStatusModalOpen(false); setError(null);}} disabled={loading}>
                 Cancel
               </Button>
-              <Button onClick={updateStatus} disabled={loading}>
+              <Button onClick={updateStatus} disabled={loading || !isNewStatusSelected}>
                 {loading ? 'Processing...' : 'Update'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={commentsModalOpen} onOpenChange={setCommentsModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Comments</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Comments</Label>
+                <Input
+                  value={comments}
+                  onChange={e => setComments(e.target.value)}
+                  disabled={loading}
+                  placeholder="Enter comments..."
+                />
+              </div>
+              {error && <div className="text-red-700">{error}</div>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setCommentsModalOpen(false); setError(null); setComments(''); }} disabled={loading}>
+                Cancel
+              </Button>
+              <Button onClick={updateComments} disabled={loading}>
+                {loading ? 'Processing...' : 'Save'}
               </Button>
             </DialogFooter>
           </DialogContent>

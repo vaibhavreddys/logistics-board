@@ -46,7 +46,7 @@ export default function TruckOwnersPage() {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         console.log('Auth response:', { user, userError }); // Debug log
         if (userError || !user) {
-          console.error('Auth error or no user:', userError?.message);
+          console.log('Auth error or no user:', userError?.message);
           router.push('/login');
           return;
         }

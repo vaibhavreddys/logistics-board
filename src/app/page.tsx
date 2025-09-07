@@ -84,7 +84,7 @@ export default function LoadBoard() {
       <Navbar />
       <main className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-3xl font-extrabold text-gray-900">Available Loads</h1>
+          <h1 className="text-3xl font-extrabold text-gray-900">Open Loads</h1>
           <div className="flex gap-4">
             <Input
               placeholder="Search by city, vehicle, or material"
