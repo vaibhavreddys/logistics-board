@@ -3,9 +3,15 @@ import { supabase } from "@/lib/supabaseClient";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    // Parse the request body
     const { truck_id } = await req.json();
 
-    // Update indent with selected truck + new status
+    // Validate truck_id (assuming it's a UUID)
+    if (!truck_id || typeof truck_id !== "string" || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(truck_id)) {
+      return NextResponse.json({ success: false, error: "Invalid or missing truck_id" }, { status: 400 });
+    }
+
+    // Update indent with selected truck and new status
     const { data, error } = await supabase
       .from("indents")
       .update({
@@ -16,10 +22,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .eq("id", params.id)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error:", error.message);
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ success: true, data });
+    if (!data || data.length === 0) {
+      return NextResponse.json({ success: false, error: "Indent not found or update failed" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: data[0] });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("Unexpected error:", err.message);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }
