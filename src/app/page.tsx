@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Phone } from 'lucide-react';
 import Navbar from '@/components/ui/Navbar';
+import { Button } from "@/components/ui/button";
 
 interface Indent {
   id: string;
@@ -58,7 +59,7 @@ export default function LoadBoard() {
             if (row.status === 'open') {
               return prev.map(i => (i.id === row.id ? row : i));
             } else {
-              return prev.filter(i => i.id !== row.id); // Remove non-open indents
+              return prev.filter(i => i.id !== row.id);
             }
           } else if (payload.eventType === 'DELETE') {
             return prev.filter(i => i.id !== payload.old.id);
@@ -79,26 +80,67 @@ export default function LoadBoard() {
   }, [q, indents]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
       <Navbar />
-      <main className="max-w-5xl mx-auto p-4 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">Open Loads</h1>
-          <Input placeholder="Search city / vehicle / material" value={q} onChange={e => setQ(e.target.value)} />
+      <main className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-3xl font-extrabold text-gray-900">Available Loads</h1>
+          <div className="flex gap-4">
+            <Input
+              placeholder="Search by city, vehicle, or material"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="w-full sm:w-64 p-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
         </div>
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map(i => (
-            <Card key={i.id} className="p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">{i.origin} → {i.destination}</h2>
-                <Badge variant={i.status === 'open' ? 'default' : 'secondary'}>{i.status}</Badge>
-              </div>
-              <p className="text-sm">Vehicle: {i.vehicle_type} • TAT: {i.tat_hours}h • Pickup: {new Date(i.pickup_at).toLocaleString()}</p>
-              <p className="text-sm">Load: {i.load_material || '—'} • {i.load_weight_kg ? `${i.load_weight_kg} kg` : ''}</p>
-              <p className="font-medium">Trip Cost: ₹{Number(i.trip_cost).toLocaleString()}</p>
-              <a className="inline-flex items-center gap-2 text-blue-600 hover:underline" href={`tel:${i.contact_phone}`}>
-                <Phone size={16} /> Contact: {i.contact_phone}
-              </a>
+            <Card key={i.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-xl">
+              {/* Header */}
+              <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex justify-between">
+                <h2 className="text-lg font-semibold self-start">{i.origin} → {i.destination}</h2>
+                <span className="text-xl font-bold self-start">{`₹${Number(i.trip_cost).toLocaleString()}`}</span>
+              </CardHeader>
+
+              {/* Content */}
+              <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
+                <div className="space-y-3 text-sm text-gray-700">
+  <div className="flex items-baseline gap-2">
+    <span className="text-gray-500 w-6 flex-shrink-0">🚚</span>
+    <span className="w-20 font-medium flex-shrink-0">Vehicle:</span>
+    <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
+      {i.vehicle_type}
+    </span>
+  </div>
+  
+  <div className="flex items-baseline gap-2">
+    <span className="text-gray-500 w-6 flex-shrink-0">📦</span>
+    <span className="w-20 font-medium flex-shrink-0">Load:</span>
+    <span className="font-semibold">{i.load_material || "—"} {i.load_weight_kg ? `${i.load_weight_kg} MT` : ""}</span>
+  </div>
+  
+  <div className="flex items-baseline gap-2">
+    <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
+    <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
+    <span>{new Date(i.pickup_at).toLocaleString()}</span>
+  </div>
+  
+  <div className="flex items-baseline gap-2">
+    <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
+    <span className="w-20 font-medium flex-shrink-0">TAT:</span>
+    <span>{i.tat_hours}h</span>
+  </div>
+</div>
+
+                <Button
+                  variant="default"
+                  className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                  onClick={() => window.location.href = `tel:${i.contact_phone}`}
+                >
+                  <Phone size={18} /> Contact: {i.contact_phone}
+                </Button>
+              </CardContent>
             </Card>
           ))}
         </div>

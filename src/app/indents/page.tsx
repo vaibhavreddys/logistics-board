@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
 import { X, Pencil } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"; // Assuming you use a UI library like shadcn for Dialog
 
 export default function IndentsPage() {
   const [form, setForm] = useState({
@@ -34,30 +41,39 @@ export default function IndentsPage() {
       const saved = localStorage.getItem('indentStatusFilters');
       return saved ? JSON.parse(saved) : {
         open: true,
-        assigned: true,
-        in_transit: true,
-        delivered: true,
+        confirmation: true,
+        vehicle_placed: true,
+        completed: true,
+        pending: true,
         cancelled: true,
+        failed: true,
       };
     }
     return {
       open: true,
-      assigned: true,
-      in_transit: true,
-      delivered: true,
+      confirmation: true,
+      vehicle_placed: true,
+      completed: true,
+      pending: true,
       cancelled: true,
+      failed: true,
     };
   });
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [comments, setComments] = useState('');
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Set isClient to true after mount to ensure client-side rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Save statusFilters to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('indentStatusFilters', JSON.stringify(statusFilters));
@@ -93,7 +109,6 @@ export default function IndentsPage() {
       try {
         const { data: c } = await supabase.from('clients').select('id,name');
         setClients(c || []);
-        // Fetch indents with admin's full_name and client name via joins
         const { data: i, error: indentError } = await supabase
           .from('indents')
           .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
@@ -105,7 +120,6 @@ export default function IndentsPage() {
         }
         setIndents(i || []);
 
-        // Preload history for each indent with updater's full_name
         if (i) {
           for (const indent of i) {
             const { data: h, error: historyError } = await supabase
@@ -132,21 +146,18 @@ export default function IndentsPage() {
     if (!form.client_id) return 'Please select a client.';
     if (!form.origin) return 'Please enter an origin.';
     if (!form.destination) return 'Please enter a destination.';
-    if (!form.vehicle_type) return 'Please enter a vehicle type.';
-    if (!form.trip_cost || Number(form.trip_cost) <= 0) return 'Please enter a valid trip cost.';
-    if (!form.tat_hours || Number(form.tat_hours) <= 0) return 'Please enter a valid TAT (hours).';
-    if (!form.load_material) return 'Please enter a load material.';
-    if (!form.pickup_at) return 'Please select a pickup date and time.';
+    if (!form.vehicle_type) return 'Please select a vehicle type.';
+    if (!form.pickup_at) return 'Please select a placement date and time.';
     if (!form.contact_phone || !/^\d{10}$/.test(form.contact_phone)) return 'Please enter a valid 10-digit contact phone number.';
     return null;
   };
 
   const createIndent = async () => {
+    setLoading(true);
     try {
       setError(null);
       setSuccess(null);
 
-      // Validate form inputs
       const validationError = validateForm();
       if (validationError) {
         setError(validationError);
@@ -171,7 +182,6 @@ export default function IndentsPage() {
         status: 'open',
       };
 
-      // Insert indent and fetch with admin's full_name and client name
       const { data: indent, error: indentError } = await supabase
         .from('indents')
         .insert(payload)
@@ -183,7 +193,6 @@ export default function IndentsPage() {
         return;
       }
 
-      // Insert initial status history
       const { error: historyError } = await supabase
         .from('indent_status_history')
         .insert({
@@ -199,7 +208,6 @@ export default function IndentsPage() {
         return;
       }
 
-      // Update indents and history state
       setIndents(prev => [indent, ...prev]);
       setHistory(prev => ({
         ...prev,
@@ -218,25 +226,22 @@ export default function IndentsPage() {
         contact_phone: '',
       });
       setEditingIndentId(null);
-      console.log('Setting success message: Indent created successfully!');
       setSuccess('Indent created successfully!');
-      // Auto-dismiss success message after 5 seconds
-      setTimeout(() => {
-        console.log('Clearing success message');
-        setSuccess(null);
-      }, 5000);
+      setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       console.error('Unexpected error creating indent:', err);
       setError('An unexpected error occurred while creating the indent.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const updateIndent = async () => {
+    setLoading(true);
     try {
       setError(null);
       setSuccess(null);
 
-      // Validate form inputs
       const validationError = validateForm();
       if (validationError) {
         setError(validationError);
@@ -270,7 +275,6 @@ export default function IndentsPage() {
         updated_at: new Date().toISOString(),
       };
 
-      // Update indent and fetch with admin's full_name and client name
       const { data: indent, error: indentError } = await supabase
         .from('indents')
         .update(payload)
@@ -283,10 +287,7 @@ export default function IndentsPage() {
         return;
       }
 
-      // Update indents state
-      setIndents(prev =>
-        prev.map(i => (i.id === editingIndentId ? indent : i))
-      );
+      setIndents(prev => prev.map(i => (i.id === editingIndentId ? indent : i)));
       setForm({
         client_id: '',
         origin: '',
@@ -300,16 +301,13 @@ export default function IndentsPage() {
         contact_phone: '',
       });
       setEditingIndentId(null);
-      console.log('Setting success message: Indent updated successfully!');
       setSuccess('Indent updated successfully!');
-      // Auto-dismiss success message after 5 seconds
-      setTimeout(() => {
-        console.log('Clearing success message');
-        setSuccess(null);
-      }, 5000);
+      setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       console.error('Unexpected error updating indent:', err);
       setError('An unexpected error occurred while updating the indent.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -327,9 +325,7 @@ export default function IndentsPage() {
       contact_phone: indent.contact_phone || '',
     });
     setEditingIndentId(indent.id);
-    if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleCancelEdit = () => {
@@ -349,23 +345,42 @@ export default function IndentsPage() {
   };
 
   const toggleStatusFilter = (status: string) => {
-    setStatusFilters(prev => ({
-      ...prev,
-      [status]: !prev[status],
-    }));
+    setStatusFilters(prev => ({ ...prev, [status]: !prev[status] }));
   };
 
-  // Helper function to format status for display
   const formatStatus = (status: string, remark: string) => {
     if (status === 'open' && remark === 'Indent created') return 'Created';
     return status
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .split(/(?=[A-Z])|_/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   };
 
-  const updateStatus = async (id: string, to_status: string) => {
+  const validateStatusUpdate = () => {
+    if (!newStatus) return 'Please select a status.';
+    if (['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus)) {
+      if (!vehicleNumber) return 'Please enter a vehicle number.';
+      const normalizedVehicleNumber = vehicleNumber.toUpperCase();
+      if (!/^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}$/.test(normalizedVehicleNumber)) {
+        return 'Please enter a valid Indian vehicle number (e.g., KA01AB1234).';
+      }
+      if (!driverPhone || !/^\d{10}$/.test(driverPhone)) {
+        return 'Please enter a valid 10-digit driver phone number.';
+      }
+    }
+    return null;
+  };
+
+  const updateStatus = async () => {
+    setLoading(true);
     try {
+      const validationError = validateStatusUpdate();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      setError(null);
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         console.error('No authenticated user:', userError?.message);
@@ -373,34 +388,40 @@ export default function IndentsPage() {
         return;
       }
 
-      // Find the current indent
-      const currentIndent = indents.find(i => i.id === id);
+      const currentIndent = indents.find(i => i.id === selectedIndentId);
       if (!currentIndent) {
-        console.error('Indent not found:', id);
+        console.error('Indent not found:', selectedIndentId);
         setError('Indent not found.');
         return;
       }
 
-      // Skip if the status is the same
-      if (currentIndent.status === to_status) {
-        console.log('Status unchanged, skipping update:', to_status);
+      if (currentIndent.status === newStatus) {
+        console.log('Status unchanged, skipping update:', newStatus);
+        setStatusModalOpen(false);
         return;
       }
 
-      const { error: updateError } = await supabase.from('indents').update({ status: to_status }).eq('id', id);
+      const payload: any = { status: newStatus };
+      if (['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus)) {
+        payload.vehicle_number = vehicleNumber.toUpperCase();
+        payload.driver_phone = driverPhone;
+      }
+
+      const { error: updateError } = await supabase.from('indents').update(payload).eq('id', selectedIndentId);
       if (updateError) {
         console.error('Error updating indent status:', updateError.message);
         setError(`Failed to update indent status: ${updateError.message}`);
         return;
       }
 
+      const remark = `status → ${newStatus}${vehicleNumber ? `, Vehicle: ${vehicleNumber}` : ''}${driverPhone ? `, Driver Phone: ${driverPhone}` : ''}${comments ? `, Comments: ${comments}` : ''}`;
       const { error: historyError } = await supabase
         .from('indent_status_history')
         .insert({
-          indent_id: id,
-          to_status,
+          indent_id: selectedIndentId,
+          to_status: newStatus,
           changed_by: user.id,
-          remark: `status → ${to_status}`,
+          remark: remark,
         });
 
       if (historyError) {
@@ -409,11 +430,10 @@ export default function IndentsPage() {
         return;
       }
 
-      // Fetch updated history with updater's full_name
       const { data: h, error: fetchError } = await supabase
         .from('indent_status_history')
         .select('*, profiles!indent_status_history_changed_by_fkey(full_name)')
-        .eq('indent_id', id)
+        .eq('indent_id', selectedIndentId)
         .order('changed_at', { ascending: false });
 
       if (fetchError) {
@@ -422,20 +442,23 @@ export default function IndentsPage() {
         return;
       }
 
-      // Update indents state with new status
-      setIndents(prev =>
-        prev.map(i =>
-          i.id === id ? { ...i, status: to_status } : i
-        )
-      );
-      setHistory(prev => ({ ...prev, [id]: h || [] }));
+      setIndents(prev => prev.map(i => i.id === selectedIndentId ? { ...i, ...payload, status: newStatus } : i));
+      setHistory(prev => ({ ...prev, [selectedIndentId]: h || [] }));
+      setSuccess('Status updated successfully!');
+      setTimeout(() => setSuccess(null), 5000);
+      setStatusModalOpen(false);
+      setNewStatus('');
+      setVehicleNumber('');
+      setDriverPhone('');
+      setComments('');
     } catch (err) {
       console.error('Error updating status:', err);
       setError('Failed to update indent status. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Filter indents based on search query and status filters
   const filteredIndents = useMemo(() => {
     const s = q.toLowerCase();
     return indents.filter(i =>
@@ -464,7 +487,6 @@ export default function IndentsPage() {
             </button>
           </div>
         )}
-        {/* Create/Edit indent form */}
         <Card className="p-4 space-y-3" ref={formRef}>
           <h2 className="text-xl font-bold">{editingIndentId ? 'Editing Indent' : 'Create Indent'}</h2>
           <div className="grid md:grid-cols-3 gap-3">
@@ -493,7 +515,35 @@ export default function IndentsPage() {
             </div>
             <div>
               <Label>Vehicle Type</Label>
-              <Input value={form.vehicle_type} onChange={e => setForm({ ...form, vehicle_type: e.target.value })} />
+              <select
+                className="w-full border rounded p-2"
+                value={form.vehicle_type}
+                onChange={e => setForm({ ...form, vehicle_type: e.target.value })}
+              >
+                <option value="">Select vehicle type</option>
+                <option value="32 ft MXL">32 ft MXL (Multi Axle)</option>
+                <option value="32 ft SXL">32 ft SXL (Single Axle)</option>
+                <option value="24 ft Truck">24 ft Truck</option>
+                <option value="20 ft Truck">20 ft Truck</option>
+                <option value="22 ft Truck">22 ft Truck</option>
+                <option value="17 ft Truck">17 ft Truck</option>
+                <option value="14 ft Truck">14 ft Truck</option>
+                <option value="10 ft (407)">10 ft Truck / Tata 407</option>
+                <option value="8 ft (Bolero)">8 ft Pickup (Bolero / Pickup)</option>
+                <option value="7 ft TataAce">7 ft Tata Ace</option>
+              </select>
+            </div>
+            <div>
+              <Label>Load Weight (MT)</Label>
+              <Input
+                type="number"
+                value={form.load_weight_kg}
+                onChange={e => setForm({ ...form, load_weight_kg: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Load Material</Label>
+              <Input value={form.load_material} onChange={e => setForm({ ...form, load_material: e.target.value })} />
             </div>
             <div>
               <Label>Trip Cost (₹)</Label>
@@ -512,19 +562,7 @@ export default function IndentsPage() {
               />
             </div>
             <div>
-              <Label>Load Material</Label>
-              <Input value={form.load_material} onChange={e => setForm({ ...form, load_material: e.target.value })} />
-            </div>
-            <div>
-              <Label>Load Weight (kg)</Label>
-              <Input
-                type="number"
-                value={form.load_weight_kg}
-                onChange={e => setForm({ ...form, load_weight_kg: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Pickup Date & Time</Label>
+              <Label>Placement Date & Time</Label>
               <Input
                 type="datetime-local"
                 value={form.pickup_at}
@@ -541,8 +579,8 @@ export default function IndentsPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={editingIndentId ? updateIndent : createIndent}>
-              {editingIndentId ? 'Update Indent' : 'Post to Load Board'}
+            <Button onClick={editingIndentId ? updateIndent : createIndent} disabled={loading}>
+              {loading ? 'Processing...' : (editingIndentId ? 'Update Indent' : 'Post to Load Board')}
             </Button>
             {editingIndentId && (
               <Button variant="outline" onClick={handleCancelEdit}>
@@ -552,7 +590,6 @@ export default function IndentsPage() {
           </div>
         </Card>
 
-        {/* My indents */}
         <section className="space-y-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h2 className="text-xl font-bold">My Indents ({filteredIndents.length})</h2>
@@ -565,7 +602,7 @@ export default function IndentsPage() {
           </div>
           {isClient && (
             <div className="flex flex-wrap gap-2">
-              {['open', 'assigned', 'in_transit', 'delivered', 'cancelled'].map(status => (
+              {['open', 'confirmation', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
                 <Button
                   key={status}
                   variant={statusFilters[status] ? 'default' : 'outline'}
@@ -585,27 +622,32 @@ export default function IndentsPage() {
                     <div className="font-semibold">{i.origin} → {i.destination}</div>
                     <div className="text-sm">Client: {i.clients?.name || 'Unknown Client'}</div>
                     <div className="text-sm">{i.vehicle_type} • Pickup {new Date(i.pickup_at).toLocaleString()}</div>
+                    {i.vehicle_number && <div className="text-sm">Vehicle: {i.vehicle_number}</div>}
+                    {i.driver_phone && <div className="text-sm">Driver Phone: {i.driver_phone}</div>}
                   </div>
                   <div className="text-sm">Created by: <b>{i.profiles?.full_name || 'Unknown'}</b></div>
                 </div>
 
-                {/* Status buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  {['open', 'assigned', 'in_transit', 'delivered', 'cancelled'].map(s => (
-                    <button
-                      key={s}
-                      className={`px-3 py-1 rounded border ${
-                        i.status === s ? 'bg-black text-white' : 'bg-white text-black'
-                      } ${i.status === s ? 'cursor-not-allowed' : 'hover:bg-gray-200'}`}
-                      onClick={() => updateStatus(i.id, s)}
-                      disabled={i.status === s}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-medium">Status:</Label>
+                  <span className="border rounded p-2">{formatStatus(i.status, '')}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedIndentId(i.id);
+                      setNewStatus(i.status);
+                      setVehicleNumber(i.vehicle_number || '');
+                      setDriverPhone(i.driver_phone || '');
+                      setComments('');
+                      setStatusModalOpen(true);
+                    }}
+                    disabled={loading}
+                  >
+                    Update Status
+                  </Button>
                 </div>
 
-                {/* Status history */}
                 <div className="mt-3 space-y-1 text-sm">
                   <b>Status History:</b>
                   {(history[i.id] || []).map((h, index) => (
@@ -615,7 +657,6 @@ export default function IndentsPage() {
                   ))}
                 </div>
 
-                {/* Edit button */}
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(i)}>
                     <Pencil size={16} className="mr-2" /> Edit
@@ -625,6 +666,70 @@ export default function IndentsPage() {
             ))}
           </div>
         </section>
+
+        <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Indent Status</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>New Status</Label>
+                <select
+                  className="w-full border rounded p-2"
+                  value={newStatus}
+                  onChange={e => setNewStatus(e.target.value)}
+                  disabled={loading}
+                >
+                  {['open', 'confirmation', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
+                    <option key={status} value={status} disabled={indents.find(i => i.id === selectedIndentId)?.status === status}>
+                      {formatStatus(status, '')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus) && (
+                <>
+                  <div>
+                    <Label>Vehicle Number</Label>
+                    <Input
+                      value={vehicleNumber}
+                      onChange={e => setVehicleNumber(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <Label>Driver Phone</Label>
+                    <Input
+                      type="text"
+                      value={driverPhone}
+                      onChange={e => setDriverPhone(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                </>
+              )}
+              <div>
+                <Label>Comments (Optional)</Label>
+                <Input
+                  value={comments}
+                  onChange={e => setComments(e.target.value)}
+                  disabled={loading}
+                  placeholder="Add any comments..."
+                />
+              </div>
+              {error && <div className="text-red-700">{error}</div>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setStatusModalOpen(false); setError(null);}} disabled={loading}>
+                Cancel
+              </Button>
+              <Button onClick={updateStatus} disabled={loading}>
+                {loading ? 'Processing...' : 'Update'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -53,7 +53,7 @@ export default function Navbar() {
               { href: '/indents', label: 'Indents' },
               { href: '/clients', label: 'Clients' },
               { href: '/trucks', label: 'Trucks' },
-              { href: '/truck-owners/view', label: 'Truck Owners' },
+              // { href: '/truck-owners/view', label: 'Truck Owners' },
             ]
           : []),
         ...(userRole === 'truck_owner' ? [{ href: '/trucks', label: 'Trucks' }] : []),
@@ -62,26 +62,30 @@ export default function Navbar() {
     : [];
 
   return (
-    <nav className="bg-white shadow-md p-4">
+    <nav className="bg-gradient-to-r from-blue-600 to-purple-700 text-white shadow-lg p-4">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
-        <div className="text-xl font-bold">Freight 24</div>
+        <div className="text-2xl font-bold tracking-wide">Freight 24</div>
         <div className="md:hidden">
-          <button onClick={toggleMenu} aria-label="Toggle menu">
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          <button
+            onClick={toggleMenu}
+            aria-label="Toggle menu"
+            className="text-white hover:text-gray-200 transition-colors"
+          >
+            {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
           </button>
         </div>
-        <div className={`md:flex items-center gap-4 ${isMenuOpen ? 'block' : 'hidden'} md:block`}>
-          <ul className="flex flex-col md:flex-row gap-4 md:gap-6">
+        <div className={`md:flex items-center gap-6 ${isMenuOpen ? 'block' : 'hidden'} md:block`}>
+          <ul className="flex flex-col md:flex-row gap-6">
             {navLinks.map(link => (
               <li key={link.href}>
                 {pathname === link.href ? (
-                  <span className="text-blue-600 font-bold cursor-default">
+                  <span className="text-yellow-300 font-bold text-lg cursor-default">
                     {link.label}
                   </span>
                 ) : (
                   <a
                     href={link.href}
-                    className="text-gray-600 hover:text-blue-600"
+                    className="text-white hover:text-yellow-300 text-lg transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       router.push(link.href);
@@ -97,7 +101,7 @@ export default function Navbar() {
           {isLoggedIn ? (
             <Button
               variant="outline"
-              className="mt-4 md:mt-0 md:ml-4"
+              className="mt-4 md:mt-0 md:ml-6 border-white text-black hover:bg-white hover:text-purple-700"
               onClick={handleLogout}
             >
               Logout
@@ -105,7 +109,7 @@ export default function Navbar() {
           ) : (
             <Button
               variant="outline"
-              className="mt-4 md:mt-0 md:ml-4"
+              className="mt-4 md:mt-0 md:ml-6 border-white text-black hover:bg-white hover:text-purple-700"
               onClick={handleLogin}
             >
               Login
@@ -114,18 +118,18 @@ export default function Navbar() {
         </div>
       </div>
       {isMenuOpen && (
-        <div className="md:hidden mt-2">
-          <ul className="flex flex-col gap-2">
+        <div className="md:hidden mt-4 bg-gray-800 bg-opacity-90 p-4 rounded-lg">
+          <ul className="flex flex-col gap-4">
             {navLinks.map(link => (
               <li key={link.href}>
                 {pathname === link.href ? (
-                  <span className="block text-blue-600 font-bold p-2 cursor-default">
+                  <span className="block text-yellow-300 font-bold p-2 cursor-default">
                     {link.label}
                   </span>
                 ) : (
                   <a
                     href={link.href}
-                    className="block text-gray-600 hover:text-blue-600 p-2"
+                    className="block text-white hover:text-yellow-300 p-2"
                     onClick={(e) => {
                       e.preventDefault();
                       router.push(link.href);
@@ -141,7 +145,7 @@ export default function Navbar() {
               {isLoggedIn ? (
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-white text-white hover:bg-white hover:text-purple-700"
                   onClick={handleLogout}
                 >
                   Logout
@@ -149,7 +153,7 @@ export default function Navbar() {
               ) : (
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-white text-white hover:bg-white hover:text-purple-700"
                   onClick={handleLogin}
                 >
                   Login

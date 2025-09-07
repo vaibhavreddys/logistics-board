@@ -334,16 +334,16 @@ export default function TrucksPage() {
                 onChange={e => setForm({ ...form, vehicle_type: e.target.value })}
               >
                 <option value="">Select vehicle type</option>
-                <option value="32 ft MXL (Multi Axle)">32 ft MXL (Multi Axle)</option>
-                <option value="32 ft SXL (Single Axle)">32 ft SXL (Single Axle)</option>
+                <option value="32 ft MXL">32 ft MXL (Multi Axle)</option>
+                <option value="32 ft SXL">32 ft SXL (Single Axle)</option>
                 <option value="24 ft Truck">24 ft Truck</option>
                 <option value="20 ft Truck">20 ft Truck</option>
                 <option value="22 ft Truck">22 ft Truck</option>
                 <option value="17 ft Truck">17 ft Truck</option>
                 <option value="14 ft Truck">14 ft Truck</option>
-                <option value="10 ft Truck / Tata 407">10 ft Truck / Tata 407</option>
-                <option value="8 ft Pickup (Bolero / Pickup)">8 ft Pickup (Bolero / Pickup)</option>
-                <option value="7 ft Tata Ace">7 ft Tata Ace</option>
+                <option value="10 ft (407)">10 ft Truck / Tata 407</option>
+                <option value="8 ft (Bolero)">8 ft Pickup (Bolero / Pickup)</option>
+                <option value="7 ft TataAce">7 ft Tata Ace</option>
               </select>
             </div>
             <div>
