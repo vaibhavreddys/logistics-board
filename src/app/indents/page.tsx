@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
-import { X, Pencil } from 'lucide-react';
+import { X, Pencil, History, Truck, Package, Phone, Calendar, Handshake, MessageSquareText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"; // Assuming you use a UI library like shadcn for Dialog
+} from "@/components/ui/dialog";
 
 export default function IndentsPage() {
   const [form, setForm] = useState({
@@ -41,7 +41,7 @@ export default function IndentsPage() {
       const saved = localStorage.getItem('indentStatusFilters');
       return saved ? JSON.parse(saved) : {
         open: true,
-        confirmation: true,
+        confirmed: true,
         vehicle_placed: true,
         completed: true,
         pending: true,
@@ -51,7 +51,7 @@ export default function IndentsPage() {
     }
     return {
       open: true,
-      confirmation: true,
+      confirmed: true,
       vehicle_placed: true,
       completed: true,
       pending: true,
@@ -62,6 +62,7 @@ export default function IndentsPage() {
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -119,22 +120,6 @@ export default function IndentsPage() {
           return;
         }
         setIndents(i || []);
-
-        if (i) {
-          for (const indent of i) {
-            const { data: h, error: historyError } = await supabase
-              .from('indent_status_history')
-              .select('*, profiles!indent_status_history_changed_by_fkey(full_name)')
-              .eq('indent_id', indent.id)
-              .order('changed_at', { ascending: false });
-            if (historyError) {
-              console.error('Error fetching history for indent:', indent.id, historyError.message);
-              setError('Failed to load status history.');
-              continue;
-            }
-            setHistory(prev => ({ ...prev, [indent.id]: h || [] }));
-          }
-        }
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please try again.');
@@ -401,10 +386,16 @@ export default function IndentsPage() {
         return;
       }
 
-      const payload: any = { status: newStatus };
+      const payload: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
       if (['vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].includes(newStatus)) {
         payload.vehicle_number = vehicleNumber.toUpperCase();
         payload.driver_phone = driverPhone;
+      }
+      if (comments) {
+        payload.notes = comments;
       }
 
       const { error: updateError } = await supabase.from('indents').update(payload).eq('id', selectedIndentId);
@@ -414,7 +405,7 @@ export default function IndentsPage() {
         return;
       }
 
-      const remark = `status → ${newStatus}${vehicleNumber ? `, Vehicle: ${vehicleNumber}` : ''}${driverPhone ? `, Driver Phone: ${driverPhone}` : ''}${comments ? `, Comments: ${comments}` : ''}`;
+      const remark = `status --> ${newStatus}${vehicleNumber ? `, Vehicle: ${vehicleNumber}` : ''}${driverPhone ? `, Driver Phone: ${driverPhone}` : ''}${comments ? `, Comments: ${comments}` : ''}`;
       const { error: historyError } = await supabase
         .from('indent_status_history')
         .insert({
@@ -442,7 +433,13 @@ export default function IndentsPage() {
         return;
       }
 
-      setIndents(prev => prev.map(i => i.id === selectedIndentId ? { ...i, ...payload, status: newStatus } : i));
+      const { data: updatedIndent } = await supabase
+        .from('indents')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name)')
+        .eq('id', selectedIndentId)
+        .single();
+
+      setIndents(prev => prev.map(i => i.id === selectedIndentId ? updatedIndent : i));
       setHistory(prev => ({ ...prev, [selectedIndentId]: h || [] }));
       setSuccess('Status updated successfully!');
       setTimeout(() => setSuccess(null), 5000);
@@ -454,6 +451,30 @@ export default function IndentsPage() {
     } catch (err) {
       console.error('Error updating status:', err);
       setError('Failed to update indent status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchHistory = async (indentId: string) => {
+    setLoading(true);
+    try {
+      const { data: h, error: historyError } = await supabase
+        .from('indent_status_history')
+        .select('*, profiles!indent_status_history_changed_by_fkey(full_name)')
+        .eq('indent_id', indentId)
+        .order('changed_at', { ascending: false });
+      if (historyError) {
+        console.error('Error fetching history:', historyError.message);
+        setError('Failed to load status history.');
+        return;
+      }
+      setHistory(prev => ({ ...prev, [indentId]: h || [] }));
+      setSelectedIndentId(indentId);
+      setHistoryModalOpen(true);
+    } catch (err) {
+      console.error('Error fetching history:', err);
+      setError('Failed to load status history. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -602,7 +623,7 @@ export default function IndentsPage() {
           </div>
           {isClient && (
             <div className="flex flex-wrap gap-2">
-              {['open', 'confirmation', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
+              {['open', 'confirmed', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
                 <Button
                   key={status}
                   variant={statusFilters[status] ? 'default' : 'outline'}
@@ -616,51 +637,83 @@ export default function IndentsPage() {
           )}
           <div className="grid md:grid-cols-2 gap-3">
             {filteredIndents.map(i => (
-              <Card key={i.id} className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{i.origin} → {i.destination}</div>
-                    <div className="text-sm">Client: {i.clients?.name || 'Unknown Client'}</div>
-                    <div className="text-sm">{i.vehicle_type} • Pickup {new Date(i.pickup_at).toLocaleString()}</div>
-                    {i.vehicle_number && <div className="text-sm">Vehicle: {i.vehicle_number}</div>}
-                    {i.driver_phone && <div className="text-sm">Driver Phone: {i.driver_phone}</div>}
-                  </div>
-                  <div className="text-sm">Created by: <b>{i.profiles?.full_name || 'Unknown'}</b></div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm font-medium">Status:</Label>
-                  <span className="border rounded p-2">{formatStatus(i.status, '')}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedIndentId(i.id);
-                      setNewStatus(i.status);
-                      setVehicleNumber(i.vehicle_number || '');
-                      setDriverPhone(i.driver_phone || '');
-                      setComments('');
-                      setStatusModalOpen(true);
-                    }}
-                    disabled={loading}
-                  >
-                    Update Status
-                  </Button>
-                </div>
-
-                <div className="mt-3 space-y-1 text-sm">
-                  <b>Status History:</b>
-                  {(history[i.id] || []).map((h, index) => (
-                    <div key={h.id} className={`text-gray-600 ${index === 0 ? 'font-bold' : ''}`}>
-                      {new Date(h.changed_at).toLocaleString()} — {formatStatus(h.to_status, h.remark)} by {h.profiles?.full_name || 'Unknown'}
+              <Card key={i.id} className="p-4 space-y-6 bg-white shadow-md hover:shadow-lg transition-shadow">
+                <div className="space-y-2">
+                  <div className="font-semibold text-lg text-gray-800">{i.origin} ⮕ {i.destination}</div>
+                  {(i.vehicle_number || i.vehicle_type) && (
+                    <div className="text-sm text-gray-600 flex items-center">
+                      <Truck size={16} className="mr-2 text-gray-400" />
+                      <span>Vehicle : {i.vehicle_number} {i.vehicle_type}</span>
                     </div>
-                  ))}
+                  )}
+                  {(i.load_weight_kg || i.load_material) && (
+                    <div className="text-sm text-gray-600 flex items-center">
+                      <Package size={16} className="mr-2 text-gray-400" />
+                      <span>Load : {i.load_weight_kg} MT {i?.load_material}</span>
+                    </div>
+                  )}
+                  {i.driver_phone && (
+                    <div className="text-sm text-gray-600 flex items-center">
+                      <Phone size={16} className="mr-2 text-gray-400" />
+                      <span>Driver Phone : {i.driver_phone}</span>
+                    </div>
+                  )}
+                  {i.pickup_at && (
+                    <div className="text-sm text-gray-600 flex items-center">
+                      <Calendar size={16} className="mr-2 text-gray-400" />
+                      <span>Placement At : {new Date(i.pickup_at).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {i.clients?.name && (
+                    <div className="text-sm text-gray-600 flex items-center">
+                      <Handshake size={16} className="mr-2 text-gray-400" />
+                      <span>Client : {i.clients.name}</span>
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-600 flex items-center">
+                    <MessageSquareText size={16} className="mr-2 text-gray-400" />
+                    <span>Comments : {i.notes}</span>
+                  </div>
                 </div>
-
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(i)}>
-                    <Pencil size={16} className="mr-2" /> Edit
-                  </Button>
+                <div className="flex justify-between items-end">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      onClick={() => {
+                        setSelectedIndentId(i.id);
+                        setNewStatus(i.status);
+                        setVehicleNumber(i.vehicle_number || '');
+                        setDriverPhone(i.driver_phone || '');
+                        setComments(i.notes || '');
+                        setStatusModalOpen(true);
+                      }}
+                      disabled={loading}
+                    >
+                      <span className="flex items-center"><span className="hidden sm:inline">Update</span> Status</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-600 border-green-600 hover:bg-green-50"
+                      onClick={() => fetchHistory(i.id)}
+                      disabled={loading}
+                    >
+                      <span className="flex items-center"><History size={16} className="mr-1" /><span className="hidden sm:inline">View</span> History</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-purple-600 border-purple-600 hover:bg-purple-50"
+                      onClick={() => handleEdit(i)}
+                    >
+                      <span className="flex items-center"><Pencil size={16} className="mr-1" /><span className="hidden sm:inline">Edit</span></span>
+                    </Button>
+                  </div>
+                  <span className="px-2 py-0.5 bg-blue-200 text-blue-900 rounded-lg text-lg font-semibold shadow-md">
+                    {formatStatus(i.status, '')}
+                  </span>
                 </div>
               </Card>
             ))}
@@ -681,7 +734,7 @@ export default function IndentsPage() {
                   onChange={e => setNewStatus(e.target.value)}
                   disabled={loading}
                 >
-                  {['open', 'confirmation', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
+                  {['open', 'confirmed', 'vehicle_placed', 'completed', 'pending', 'cancelled', 'failed'].map(status => (
                     <option key={status} value={status} disabled={indents.find(i => i.id === selectedIndentId)?.status === status}>
                       {formatStatus(status, '')}
                     </option>
@@ -726,6 +779,31 @@ export default function IndentsPage() {
               </Button>
               <Button onClick={updateStatus} disabled={loading}>
                 {loading ? 'Processing...' : 'Update'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Status History</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {(history[selectedIndentId || ''] || []).map((h, index) => (
+                <div key={h.id} className={`p-2 rounded ${index === 0 ? 'bg-gray-100 font-bold' : 'bg-white'}`}>
+                  <div className="text-sm text-gray-600">
+                    {new Date(h.changed_at).toLocaleString()} — {formatStatus(h.to_status, h.remark)} by {h.profiles?.full_name || 'Unknown'}
+                  </div>
+                </div>
+              ))}
+              {(!history[selectedIndentId || ''] || history[selectedIndentId || ''].length === 0) && (
+                <div className="text-center text-gray-500">No history available.</div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setHistoryModalOpen(false)} disabled={loading}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
