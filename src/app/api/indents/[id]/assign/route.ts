@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Correct type for Next.js 15
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> } // ✅ Correct type
 ) {
   try {
-    const { id } = await params; // ✅ Await the Promise to resolve params
-    const { status } = await req.json(); // Assuming you're updating status
+    const { id } = await params; // ✅ Await the Promise to resolve `id`
+    const { status } = await req.json(); // Assuming you're updating the status
 
     // Validate status if needed
     if (!status || typeof status !== "string") {
@@ -17,7 +17,7 @@ export async function PATCH(
       );
     }
 
-    // Update the indent status
+    // Update the indent status in Supabase
     const { data, error } = await supabase
       .from("indents")
       .update({
