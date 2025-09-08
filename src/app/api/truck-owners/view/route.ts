@@ -19,34 +19,43 @@ export async function GET() {
         )
       `)
       .eq('role', 'truck_owner');
+
     if (profileError) {
       console.error('Error fetching profiles:', profileError.message);
       return NextResponse.json({ error: 'Failed to load truck owners' }, { status: 500 });
     }
 
     const truckOwners = [];
-    for (const profile of profiles) {
-      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+    for (const profile of profiles || []) {
+      const { data: userData, error: userError } =
+        await supabaseAdmin.auth.admin.getUserById(profile.id);
+
       if (userError || !userData.user) {
         console.error('Error fetching user email:', userError?.message, 'ID:', profile.id);
         continue;
       }
+
+      const truckOwnerDetails = profile.truck_owners?.[0] || {};
+
       truckOwners.push({
         id: profile.id,
         full_name: profile.full_name || 'Unknown',
         phone: profile.phone || null,
         email: userData.user.email || '',
-        aadhaar_or_pan: profile.truck_owners?.aadhaar_or_pan || '',
-        bank_account_number: profile.truck_owners?.bank_account_number || null,
-        bank_ifsc_code: profile.truck_owners?.bank_ifsc_code || null,
-        upi_id: profile.truck_owners?.upi_id || null,
-        town_city: profile.truck_owners?.town_city || null,
+        aadhaar_or_pan: truckOwnerDetails.aadhaar_or_pan || '',
+        bank_account_number: truckOwnerDetails.bank_account_number || null,
+        bank_ifsc_code: truckOwnerDetails.bank_ifsc_code || null,
+        upi_id: truckOwnerDetails.upi_id || null,
+        town_city: truckOwnerDetails.town_city || null,
       });
     }
 
     return NextResponse.json(truckOwners);
   } catch (err: any) {
     console.error('Unexpected error in GET /api/truck-owners/view:', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

@@ -13,4 +13,4 @@ if (missingVars.length > 0) {
   );
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+export const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!);

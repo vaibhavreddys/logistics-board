@@ -364,7 +364,7 @@ export default function IndentsPage() {
   };
 
   const toggleStatusFilter = (status: string) => {
-    setStatusFilters(prev => ({ ...prev, [status]: !prev[status] }));
+    setStatusFilters((prev: Record<string, boolean>) => ({ ...prev, [status]: !prev[status] }));
   };
 
   const formatStatus = (status: string, remark: string) => {
@@ -468,7 +468,12 @@ export default function IndentsPage() {
         .single();
 
       setIndents(prev => prev.map(i => i.id === selectedIndentId ? updatedIndent : i));
-      setHistory(prev => ({ ...prev, [selectedIndentId]: h || [] }));
+      setHistory(prev => {
+        if (selectedIndentId) {
+          return { ...prev, [selectedIndentId]: h || [] };
+        }
+        return prev;
+      });
       setSuccess('Status updated successfully!');
       setTimeout(() => setSuccess(null), 5000);
       setStatusModalOpen(false);

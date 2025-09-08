@@ -110,7 +110,7 @@ export default function TruckOwnerViewPage() {
         setTrucks(truckData || []);
       } catch (err) {
         console.error('Unexpected error in checkAuth:', err);
-        setError(err.message || 'An unexpected error occurred. Please try again.');
+        setError((err as any)?.message || 'An unexpected error occurred. Please try again.');
       }
     };
     checkAuth();

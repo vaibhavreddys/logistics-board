@@ -8,4 +8,7 @@ export default withPWA({
   skipWaiting: true,
 })({
   reactStrictMode: true,
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 });
