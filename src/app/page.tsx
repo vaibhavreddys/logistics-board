@@ -8,6 +8,7 @@ import { Phone } from 'lucide-react';
 import Navbar from '@/components/ui/Navbar';
 import { Button } from "@/components/ui/button";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 interface Indent {
   id: string;

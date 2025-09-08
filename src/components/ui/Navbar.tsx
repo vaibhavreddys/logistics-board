@@ -4,6 +4,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export default function Navbar() {
   const [userRole, setUserRole] = useState<string | null>(null);

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import Navbar from '@/components/ui/Navbar';
 import { User, CreditCard, Phone, X } from 'lucide-react';
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 interface TruckOwnerForm {
   full_name: string;

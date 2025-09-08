@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
 import { X, Pencil } from 'lucide-react';
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 export default function TrucksPage() {
   const [form, setForm] = useState({
