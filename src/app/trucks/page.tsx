@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
 import { X, Pencil } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export default function TrucksPage() {
   const [form, setForm] = useState({

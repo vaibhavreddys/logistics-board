@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Phone } from 'lucide-react';
 import Navbar from '@/components/ui/Navbar';
 import { Button } from "@/components/ui/button";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 interface Indent {
   id: string;

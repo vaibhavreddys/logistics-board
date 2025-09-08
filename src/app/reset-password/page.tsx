@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 interface ResetPasswordForm {
   password: string;

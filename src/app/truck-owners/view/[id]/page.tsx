@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Navbar from '@/components/ui/Navbar';
 import { User, CreditCard, Phone, X } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 interface TruckOwner {
   id: string;

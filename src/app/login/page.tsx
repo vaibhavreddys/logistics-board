@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Truck } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 interface LoginForm {
   email: string;

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Navbar from '@/components/ui/Navbar';
 import { X, History, Info, Pencil } from 'lucide-react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import {
   Dialog,
   DialogContent,
