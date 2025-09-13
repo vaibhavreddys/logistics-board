@@ -5,6 +5,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Phone } from 'lucide-react';
+import { MessageCircle } from 'lucide-react'; // Icon for WhatsApp
 import Navbar from '@/components/ui/Navbar';
 import { Button } from "@/components/ui/button";
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -25,6 +26,7 @@ interface Indent {
   status: string;
   created_at: string;
   updated_at: string;
+  short_id: string;
 }
 
 export default function LoadBoard() {
@@ -86,7 +88,7 @@ export default function LoadBoard() {
       <Navbar />
       <main className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-3xl font-extrabold text-gray-900">Open Loads</h1>
+          <h1 className="text-3xl font-extrabold text-gray-900">Available Loads</h1>
           <div className="flex gap-4">
             <Input
               placeholder="Search by city, vehicle, or material"
@@ -108,40 +110,56 @@ export default function LoadBoard() {
               {/* Content */}
               <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
                 <div className="space-y-3 text-sm text-gray-700">
-  <div className="flex items-baseline gap-2">
-    <span className="text-gray-500 w-6 flex-shrink-0">🚚</span>
-    <span className="w-20 font-medium flex-shrink-0">Vehicle:</span>
-    <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
-      {i.vehicle_type}
-    </span>
-  </div>
-  
-  <div className="flex items-baseline gap-2">
-    <span className="text-gray-500 w-6 flex-shrink-0">📦</span>
-    <span className="w-20 font-medium flex-shrink-0">Load:</span>
-    <span className="font-semibold">{i.load_material || "—"} {i.load_weight_kg ? `${i.load_weight_kg} MT` : ""}</span>
-  </div>
-  
-  <div className="flex items-baseline gap-2">
-    <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
-    <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
-    <span>{new Date(i.pickup_at).toLocaleString()}</span>
-  </div>
-  
-  <div className="flex items-baseline gap-2">
-    <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
-    <span className="w-20 font-medium flex-shrink-0">TAT:</span>
-    <span>{i.tat_hours}h</span>
-  </div>
-</div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-gray-500 w-6 flex-shrink-0">🚚</span>
+                    <span className="w-20 font-medium flex-shrink-0">Vehicle:</span>
+                    <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
+                      {i.vehicle_type}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-gray-500 w-6 flex-shrink-0">📦</span>
+                    <span className="w-20 font-medium flex-shrink-0">Load:</span>
+                    <span className="font-semibold">{i.load_material || "—"} {i.load_weight_kg ? `${i.load_weight_kg} MT` : ""}</span>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
+                    <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
+                    <span>{new Date(i.pickup_at).toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
+                    <span className="w-20 font-medium flex-shrink-0">TAT:</span>
+                    <span>{i.tat_hours}h</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-gray-500 w-6 flex-shrink-0">🆔</span>
+                    <span className="w-20 font-medium flex-shrink-0">Load ID:</span>
+                    <span className="font-bold text-black-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
+                      {i.short_id}
+                    </span>
+                  </div>
+                </div>
 
-                <Button
-                  variant="default"
-                  className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-                  onClick={() => window.location.href = `tel:${i.contact_phone}`}
-                >
-                  <Phone size={18} /> Contact: {i.contact_phone}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                    onClick={() => window.location.href = `tel:${i.contact_phone}`}
+                  >
+                    <Phone size={18} /> Contact
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"
+                    onClick={() => window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=Hello%0AI'm%20Interested%20in%20this%20load%0AID:%20${i.short_id}`, '_blank')}
+                  >
+                    <MessageCircle size={18} /> WhatsApp
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

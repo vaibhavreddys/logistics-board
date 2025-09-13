@@ -56,6 +56,7 @@ export default function Navbar() {
               { href: '/clients', label: 'Clients' },
               { href: '/trucks', label: 'Trucks' },
               { href: '/trips', label: 'Trips' },
+              { href: '/profiles', label: 'Profiles' },
             ]
           : []),
         ...(userRole === 'truck_owner' ? [{ href: '/trucks', label: 'Trucks' }] : []),

@@ -67,6 +67,8 @@ export default function IndentsPage() {
   const [driverPhone, setDriverPhone] = useState('');
   const [comments, setComments] = useState('');
   const [isNewStatusSelected, setIsNewStatusSelected] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredTrucks, setFilteredTrucks] = useState<any[]>([]);
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -81,61 +83,77 @@ export default function IndentsPage() {
   }, [statusFilters]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          console.log('Auth error or no user:', userError?.message);
-          router.push('/login');
-          return;
-        }
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profileError || profile?.role !== 'admin') {
-          console.error('Profile fetch error or not admin:', profileError?.message);
-          router.push('/');
-        }
-      } catch (err) {
-        console.error('Unexpected error in checkAuth:', err);
-        setError('An unexpected error occurred. Please try again.');
+  const checkAuth = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.log('Auth error or no user:', userError?.message);
+        router.push('/login');
+        return;
       }
-    };
-    checkAuth();
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profileError || profile?.role !== 'admin') {
+        console.error('Profile fetch error or not admin:', profileError?.message);
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('Unexpected error in checkAuth:', err);
+      setError('An unexpected error occurred. Please try again.');
+    }
+  };
+  checkAuth();
 
-    (async () => {
-      try {
-        const { data: c } = await supabase.from('clients').select('id,name');
-        setClients(c || []);
-        const { data: i, error: indentError } = await supabase
-          .from('indents')
-          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
-          .order('created_at', { ascending: false });
-        if (indentError) {
-          console.error('Error fetching indents:', indentError.message);
-          setError('Failed to load indents.');
-          return;
-        }
-        setIndents(i || []);
-        const { data: t, error: truckError } = await supabase
-          .from('trucks')
-          .select('vehicle_number')
-          .eq('active', true)
-          .order('vehicle_number', { ascending: true });
-        if (truckError) {
-          console.error('Error fetching trucks:', truckError.message);
-          setError('Failed to load trucks.');
-          return;
-        }
-        setTrucks(t || []);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again.');
+  (async () => {
+    try {
+      const { data: c } = await supabase.from('clients').select('id,name');
+      setClients(c || []);
+      const { data: i, error: indentError } = await supabase
+        .from('indents')
+        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
+        .order('created_at', { ascending: false });
+      if (indentError) {
+        console.error('Error fetching indents:', indentError.message);
+        setError('Failed to load indents.');
+        return;
       }
-    })();
-  }, [router]);
+      setIndents(i || []);
+      const { data: t, error: truckError } = await supabase
+        .from('trucks')
+        .select('vehicle_number, vehicle_type')
+        .eq('active', true)
+        .order('vehicle_number', { ascending: true });
+      console.log('Fetched trucks:', t); // Debug log
+      if (truckError) {
+        console.error('Error fetching trucks:', truckError.message);
+        setError('Failed to load trucks.');
+        return;
+      }
+      setTrucks(t || []);
+      setFilteredTrucks(t || []);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again.');
+    }
+  })();
+}, [router]);
+
+useEffect(() => {
+  console.log('Search term changed:', searchTerm); // Debug log
+  if (searchTerm) {
+    const filtered = trucks.filter(t =>
+      t.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    console.log('Filtered trucks:', filtered); // Debug log
+    setFilteredTrucks(filtered);
+  } else {
+    setFilteredTrucks(trucks);
+  }
+}, [searchTerm, trucks]);
 
   const validateForm = () => {
     if (!form.client_id) return 'Please select a client.';
@@ -485,6 +503,7 @@ export default function IndentsPage() {
       setDriverPhone('');
       setComments('');
       setIsNewStatusSelected(false);
+      setSearchTerm('');
     } catch (err) {
       console.error('Error updating status:', err);
       setError('Failed to update indent status. Please try again.');
@@ -926,82 +945,105 @@ export default function IndentsPage() {
           </div>
         </section>
 
-        <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Update Indent Status</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>New Status</Label>
-                <select
-                  className="w-full border rounded p-2"
-                  value={newStatus}
-                  onChange={(e) => {
-                    setNewStatus(e.target.value);
-                    setVehicleNumber('');
-                    setDriverPhone('');
-                    setIsNewStatusSelected(e.target.value !== (indents.find(i => i.id === selectedIndentId)?.status || ''));
-                  }}
-                  disabled={loading}
-                >
-                  {['open', 'accepted', 'cancelled'].map(status => (
-                    <option key={status} value={status} disabled={indents.find(i => i.id === selectedIndentId)?.status === status}>
-                      {formatStatus(status, '')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {newStatus === 'accepted' && (
-                <>
-                  <div>
-                    <Label>Vehicle Number</Label>
-                    <select
-                      className="w-full border rounded p-2"
-                      value={vehicleNumber}
-                      onChange={e => setVehicleNumber(e.target.value)}
-                      disabled={loading}
+{/* <!-- [Previous code remains unchanged until the Dialog section] --> */}
+<Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Update Indent Status</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-4">
+      <div>
+        <Label>New Status</Label>
+        <select
+          className="w-full border rounded p-2"
+          value={newStatus}
+          onChange={(e) => {
+            setNewStatus(e.target.value);
+            setVehicleNumber('');
+            setDriverPhone('');
+            setIsNewStatusSelected(e.target.value !== (indents.find(i => i.id === selectedIndentId)?.status || ''));
+          }}
+          disabled={loading}
+        >
+          {['open', 'accepted', 'cancelled'].map(status => (
+            <option key={status} value={status} disabled={indents.find(i => i.id === selectedIndentId)?.status === status}>
+              {formatStatus(status, '')}
+            </option>
+          ))}
+        </select>
+      </div>
+      {newStatus === 'accepted' && (
+        <>
+          <div>
+            <Label>Vehicle Number</Label>
+            <Input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search vehicle number or type..."
+              className="w-full border rounded p-2 mb-2"
+              autoComplete="off"
+            />
+            {searchTerm && (
+              <div className="border rounded max-h-40 overflow-y-auto bg-white shadow-md z-10">
+                {filteredTrucks.length > 0 ? (
+                  filteredTrucks.map(t => (
+                    <div
+                      key={t.vehicle_number}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                      onClick={() => {
+                        console.log('Selecting vehicle:', t.vehicle_number); // Debug log
+                        setVehicleNumber(t.vehicle_number);
+                        setSearchTerm('');
+                        setStatusModalOpen(true); // Ensure modal stays open
+                      }}
                     >
-                      <option value="">Select vehicle number</option>
-                      {trucks.map(t => (
-                        <option key={t.vehicle_number} value={t.vehicle_number}>
-                          {t.vehicle_number}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Driver Phone</Label>
-                    <Input
-                      type="text"
-                      value={driverPhone}
-                      onChange={e => setDriverPhone(e.target.value)}
-                      disabled={loading}
-                    />
-                  </div>
-                </>
-              )}
-              <div>
-                <Label>Comments (Optional)</Label>
-                <Input
-                  value={comments}
-                  onChange={e => setComments(e.target.value)}
-                  disabled={loading || !isNewStatusSelected}
-                  placeholder="Add any comments..."
-                />
+                      {t.vehicle_number} ({t.vehicle_type})
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-2 text-gray-500">No matching vehicles found.</div>
+                )}
               </div>
-              {error && <div className="text-red-700">{error}</div>}
+            )}
+            <div className="mt-2 text-gray-700">
+              Selected Vehicle: {vehicleNumber || 'None'}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setStatusModalOpen(false); setError(null);}} disabled={loading}>
-                Cancel
-              </Button>
-              <Button onClick={updateStatus} disabled={loading || !isNewStatusSelected}>
-                {loading ? 'Processing...' : 'Update'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <div>
+            <Label>Driver Phone</Label>
+            <Input
+              type="text"
+              value={driverPhone}
+              onChange={e => setDriverPhone(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+        </>
+      )}
+      <div>
+        <Label>Comments (Optional)</Label>
+        <Input
+          value={comments}
+          onChange={e => setComments(e.target.value)}
+          disabled={loading || !isNewStatusSelected}
+          placeholder="Add any comments..."
+        />
+      </div>
+      {error && <div className="text-red-700">{error}</div>}
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => { setStatusModalOpen(false); setError(null);}} disabled={loading}>
+        Cancel
+      </Button>
+      <Button onClick={updateStatus} disabled={loading || !isNewStatusSelected}>
+        {loading ? 'Processing...' : 'Update'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+{/* <!-- [Remaining code remains unchanged] --> */}
 
         <Dialog open={commentsModalOpen} onOpenChange={setCommentsModalOpen}>
           <DialogContent>

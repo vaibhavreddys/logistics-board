@@ -254,6 +254,21 @@ export default function TripsPage() {
     return "₹" + num.toLocaleString("en-IN");
   };
 
+  const calculateBalance = (trip: any) => {
+    const tripCost = trip.indents?.trip_cost || 0;
+    const deductions = [
+      trip.trip_payments?.advance_payment || 0,
+      trip.trip_payments?.final_payment || 0,
+      trip.trip_payments?.toll_charges || 0,
+      trip.trip_payments?.halting_charges || 0,
+      trip.trip_payments?.traffic_fines || 0,
+      trip.trip_payments?.handling_charges || 0,
+      trip.trip_payments?.platform_fees || 0,
+      trip.trip_payments?.platform_fines || 0,
+    ].reduce((a, b) => a + Number(b), 0);
+    return tripCost - deductions;
+  };
+
   const updatePayment = async () => {
     setLoading(true);
     try {
@@ -435,37 +450,41 @@ export default function TripsPage() {
                         {/* Left Column */}
                         <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-gray-500">Client Cost</p>
+                            {/* <p className="text-xs text-gray-500">Client Cost</p>
                             <p className="text-sm font-semibold text-gray-900">
                               {formatCurrency(i.client_cost)}
+                            </p> */}
+                            <p className="text-xs text-gray-500">Final Amount Paid</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {formatCurrency(i.trip_payments?.final_payment )}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Trip Cost</p>
                             <p className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(i.trip_payments?.trip_cost || 0)}
+                              {formatCurrency(i?.indents?.trip_cost || 0)}
                             </p>
                           </div>
                         </div>
 
                         {/* Center Column */}
                         <div className="flex flex-col items-center justify-center">
-                          <p className="text-xs text-gray-500">Balance Amount</p>
+                          <p className="text-xs text-gray-500">Balance</p>
                           <p className="text-lg font-extrabold text-gray-900">
-                            {formatCurrency((i.client_cost || 0) - (i.trip_payments?.advance_payment || 0) - (i.trip_payments?.final_payment || 0))}
+                            {formatCurrency(calculateBalance(i))}
                           </p>
                         </div>
 
                         {/* Right Column */}
                         <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-gray-500">Advance Amount</p>
+                            <p className="text-xs text-gray-500">Advance Paid</p>
                             <p className="text-sm font-semibold text-gray-900">
                               {formatCurrency(i.trip_payments?.advance_payment || 0)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Other Charges</p>
+                            <p className="text-xs text-gray-500">Charges</p>
                             <p className="text-sm font-semibold text-gray-900">
                               {formatCurrency(
                                 [
@@ -611,8 +630,12 @@ export default function TripsPage() {
                         <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.indents?.trip_cost || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Advance Amount</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-50">Advance Amount Paid</td>
                         <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-50">Final Amount Paid</td>
+                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.final_payment || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Other Charges</td>
@@ -629,7 +652,7 @@ export default function TripsPage() {
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Balance Amount</td>
-                        <td className="py-1">₹{((trips.find(i => i.id === selectedTripId)?.client_cost || 0) - (trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0) - (trips.find(i => i.id === selectedTripId)?.trip_payments?.final_payment || 0))}</td>
+                        <td className="py-1">₹{calculateBalance(trips.find(i => i.id === selectedTripId) || { indents: {}, trip_payments: {} })}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Status</td>
