@@ -43,7 +43,7 @@ export default function TripsPage() {
     handling_charges: 0,
     platform_fees: 0,
     platform_fines: 0,
-    payment_status: 'Pending' as const,
+    payment_status: 'Pending',
   });
   const [showDeductions, setShowDeductions] = useState(false);
   const router = useRouter();

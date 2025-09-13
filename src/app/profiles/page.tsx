@@ -64,7 +64,7 @@ export default function ProfilesPage() {
   const [selectedOwner, setSelectedOwner] = useState<TruckOwner | null>(null);
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default to open on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to open on mobile
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -103,6 +103,7 @@ export default function ProfilesPage() {
           )
         `)
         .eq('role', 'truck_owner');
+      console.log('Fetched ownersData:', ownersData); // Debug log for owners data
       if (ownersError) console.error('Error fetching truck owners:', ownersError);
       setTruckOwners(ownersData || []);
 
@@ -112,6 +113,7 @@ export default function ProfilesPage() {
         .from('trucks')
         .select('*')
         .in('owner_id', ownerIds);
+      console.log('Fetched trucksData:', trucksData); // Debug log for trucks data
       if (trucksError) console.error('Error fetching trucks:', trucksError);
       setTrucks(trucksData || []);
 
@@ -128,6 +130,7 @@ export default function ProfilesPage() {
         `)
         .in('truck_id', truckIds)
         .order('created_at', { ascending: false });
+      console.log('Fetched tripsData:', tripsData); // Debug log for trips data
       if (tripsError) console.error('Error fetching trips:', tripsError);
       setTrips(tripsData || []);
 
@@ -163,6 +166,9 @@ export default function ProfilesPage() {
   const getTripOwner = (trip: Trip) => truckOwners.find(o => getOwnerTrucks(o.id).some(t => t.id === trip.truck_id));
 
   if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
+
+  console.log('Current selectedOwner:', selectedOwner); // Debug log for selected owner
+  console.log('Current isSidebarOpen:', isSidebarOpen); // Debug log for sidebar state
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -284,7 +290,16 @@ export default function ProfilesPage() {
               <Button
                 variant="outline"
                 className="mb-4 bg-white border-gray-300 text-gray-900 hover:bg-gray-100"
-                onClick={() => setIsSidebarOpen(true)}
+                onClick={() => {
+                  if (window.matchMedia('(min-width: 768px)').matches) {
+                    setSelectedOwner(null);
+                    setSelectedTruck(null);
+                    setSelectedTrip(null);
+                    setIsSidebarOpen(false);
+                  } else {
+                    setIsSidebarOpen(true);
+                  }
+                }}
               >
                 <ChevronLeft size={16} className="mr-2" />
                 Back
