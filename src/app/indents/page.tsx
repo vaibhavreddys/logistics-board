@@ -176,7 +176,6 @@ useEffect(() => {
     if (!form.vehicle_type) return 'Please select a vehicle type.';
     if (!form.pickup_at) return 'Please select a placement date and time.';
     if (!form.contact_phone || !/^\d{10}$/.test(form.contact_phone)) return 'Please enter a valid 10-digit contact phone number.';
-    if (!form.client_cost && !form.trip_cost) return 'Please enter either Client Cost or Trip Cost.';
     return null;
   };
 
@@ -723,19 +722,19 @@ useEffect(() => {
               <Input value={form.load_material} onChange={e => setForm({ ...form, load_material: e.target.value })} />
             </div>
             <div>
-              <Label>Trip Cost (₹)</Label>
-              <Input
-                type="number"
-                value={form.trip_cost}
-                onChange={e => setForm({ ...form, trip_cost: e.target.value })}
-              />
-            </div>
-            <div>
               <Label>Client Cost (₹)</Label>
               <Input
                 type="number"
                 value={form.client_cost}
                 onChange={e => setForm({ ...form, client_cost: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Trip Cost (₹)</Label>
+              <Input
+                type="number"
+                value={form.trip_cost}
+                onChange={e => setForm({ ...form, trip_cost: e.target.value })}
               />
             </div>
             <div>

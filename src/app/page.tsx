@@ -29,6 +29,40 @@ interface Indent {
   short_id: string;
 }
 
+// Custom function for dd/mm/yyyy HH:mm format
+const formatDateDDMMYYYY = (date: string): string => {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = d.getFullYear();
+    const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const period = d.getHours() >= 12 ? 'PM' : 'AM';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
+// Custom function for dd/<month in English>/yyyy HH:mm format
+const formatDateDDMonthYYYY = (date: string): string => {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getMonth()];
+    const year = d.getFullYear();
+    const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const period = d.getHours() >= 12 ? 'PM' : 'AM';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
 export default function LoadBoard() {
   const [indents, setIndents] = useState<Indent[]>([]);
   const [q, setQ] = useState('');
@@ -127,7 +161,7 @@ export default function LoadBoard() {
                   <div className="flex items-baseline gap-2">
                     <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
                     <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
-                    <span>{new Date(i.pickup_at).toLocaleString()}</span>
+                    <span>{formatDateDDMMYYYY(i.pickup_at)}</span>
                   </div>
                   
                   <div className="flex items-baseline gap-2">
@@ -155,7 +189,21 @@ export default function LoadBoard() {
                   <Button
                     variant="outline"
                     className="flex-1 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"
-                    onClick={() => window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=Hello%0AI'm%20Interested%20in%20this%20load%0AID:%20${i.short_id}`, '_blank')}
+                    onClick={() => {
+                      const loadDetails = [
+                        `Load ID: *${i.short_id}*`,
+                        `Route: ${i.origin} → ${i.destination}`,
+                        `Vehicle: ${i.vehicle_type}`,
+                        i.load_material ? `Material: ${i.load_material}` : null,
+                        i.load_weight_kg ? `Weight: ${i.load_weight_kg} MT` : null,
+                        `Pickup: ${formatDateDDMMYYYY(i.pickup_at)}`,
+                      ]
+                        .filter(Boolean) // Remove null/undefined values
+                        .join('\n'); // Join with newlines for WhatsApp formatting
+
+                      const message = encodeURIComponent(`Hello,\nI'm interested in this load:\n\n${loadDetails}`);
+                      window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`, '_blank');
+                    }}
                   >
                     <MessageCircle size={18} /> WhatsApp
                   </Button>
