@@ -43,10 +43,6 @@ export default function IndentsPage() {
   const [q, setQ] = useState('');
   const [editingIndentId, setEditingIndentId] = useState<string | null>(null);
   const [statusFilters, setStatusFilters] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('indentStatusFilter');
-      return saved || 'open'; // Default to 'open' if no saved filter
-    }
     return 'open';
   });
   const [isClient, setIsClient] = useState(false);
@@ -71,12 +67,6 @@ export default function IndentsPage() {
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('indentStatusFilter', statusFilters);
-    }
-  }, [statusFilters]);
 
   useEffect(() => {
   const checkAuth = async () => {
