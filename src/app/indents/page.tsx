@@ -44,18 +44,10 @@ export default function IndentsPage() {
   const [editingIndentId, setEditingIndentId] = useState<string | null>(null);
   const [statusFilters, setStatusFilters] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('indentStatusFilters');
-      return saved ? JSON.parse(saved) : {
-        open: true,
-        accepted: true,
-        cancelled: true,
-      };
+      const saved = localStorage.getItem('indentStatusFilter');
+      return saved || 'open'; // Default to 'open' if no saved filter
     }
-    return {
-      open: true,
-      accepted: true,
-      cancelled: true,
-    };
+    return 'open';
   });
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,7 +74,7 @@ export default function IndentsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('indentStatusFilters', JSON.stringify(statusFilters));
+      localStorage.setItem('indentStatusFilter', statusFilters);
     }
   }, [statusFilters]);
 
@@ -398,7 +390,8 @@ useEffect(() => {
   };
 
   const toggleStatusFilter = (status: string) => {
-    setStatusFilters((prev: Record<string, boolean>) => ({ ...prev, [status]: !prev[status] }));
+    setStatusFilters(status === statusFilters ? '' : status); // Toggle off if same, else set new status
+    console.log('Status filter set to:', status === statusFilters ? 'none' : status); // Debug log
   };
 
   const formatStatus = (status: string, remark: string) => {
@@ -618,7 +611,7 @@ useEffect(() => {
   const filteredIndents = useMemo(() => {
     const s = q.toLowerCase();
     return indents.filter(i =>
-      statusFilters[i.status] &&
+      (statusFilters === '' || statusFilters === i.status) &&
       [i.origin, i.destination, i.vehicle_type, i.clients?.name || ''].some(t => t.toLowerCase().includes(s))
     );
   }, [q, indents, statusFilters]);
@@ -789,7 +782,7 @@ useEffect(() => {
               {['open', 'accepted', 'cancelled'].map(status => (
                 <Button
                   key={status}
-                  variant={statusFilters[status] ? 'default' : 'outline'}
+                  variant={statusFilters === status ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => toggleStatusFilter(status)}
                 >
