@@ -214,7 +214,7 @@ export default function ProfilesPage() {
                 setSelectedTruck(null);
                 setSelectedTrip(null);
                 setIsSidebarOpen(false);
-                console.log('Selected provider:', { id: owner.id, full_name: owner.full_name, role: owner.role });
+                // console.log('Selected provider:', { id: owner.id, full_name: owner.full_name, role: owner.role });
               }}
             >
               <div className="flex items-center">

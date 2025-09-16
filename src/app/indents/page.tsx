@@ -140,7 +140,7 @@ export default function IndentsPage() {
         .eq('active', true)
         .order('vehicle_number', { ascending: true });
       console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
-      console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
+      // console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
       if (truckError) {
         console.error('Error fetching trucks:', truckError.message);
         setError('Failed to load trucks.');
