@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'; // Import UUID generator
 
 export async function POST(request: Request) {
   const data = await request.json();
-  const { full_name, phone, aadhaar_or_pan, bank_account_number, bank_ifsc_code, upi_id, town_city } = data;
+  const { full_name, phone, role, aadhaar_or_pan, bank_account_number, bank_ifsc_code, upi_id, town_city } = data;
 
   try {
     // Generate a new UUID for the profile and user
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     // Create profile
     const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({ id: userData.user.id, full_name, phone })
+      .insert({ id: userData.user.id, full_name, phone, role })
       .select('id')
       .single();
     if (profileError) throw profileError;

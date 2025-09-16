@@ -102,10 +102,22 @@ export default function ProfilesPage() {
             town_city
           )
         `)
-        .eq('role', 'truck_owner');
-      console.log('Fetched ownersData:', ownersData); // Debug log for owners data
+        .in('role', ['truck_owner', 'truck_agent'])
+        .order('full_name', { ascending: true });
+      console.log('Fetched profiles:', ownersData, 'Count:', ownersData?.length || 0); // Debug log
+      console.log('Profile roles:', ownersData?.map(p => ({ id: p.id, full_name: p.full_name, role: p.role }))); // Debug log
       if (ownersError) console.error('Error fetching truck owners:', ownersError);
-      setTruckOwners(ownersData || []);
+      const formattedOwners = ownersData?.map(owner => ({
+        ...owner,
+        truck_owners: owner.role === 'truck_owner' ? (owner.truck_owners || {}) : {},
+      })) || [];
+      console.log('Formatted owners for state:', formattedOwners.map(o => ({
+        id: o.id,
+        full_name: o.full_name,
+        role: o.role,
+        truck_owners: o.truck_owners
+      }))); // Debug log
+      setTruckOwners(formattedOwners);
 
       // Fetch trucks owned by all truck owners
       const ownerIds = ownersData?.map(o => o.id) || [];
@@ -178,17 +190,17 @@ export default function ProfilesPage() {
         <aside
           className={`bg-gray-100 p-4 overflow-y-auto transition-all duration-300 fixed md:relative z-50 ${
             isSidebarOpen
-              ? 'w-screen h-screen md:w-64 md:h-[calc(100vh-64px)]'
-              : 'w-0 h-0 md:w-64 md:h-[calc(100vh-64px)] -ml-64 md:ml-0'
+              ? 'w-screen h-screen md:w-80 md:h-[calc(100vh-64px)]'
+              : 'w-0 h-0 md:w-80 md:h-[calc(100vh-64px)] -ml-64 md:ml-0'
           }`}
         >
           <div className="mb-4">
             <h2 className="text-lg font-semibold mb-2 flex items-center">
               <Users className="mr-2" size={20} />
-              Truck Owners ({truckOwners.length})
+              Vehicle Providers ({truckOwners.length})
             </h2>
             <Input
-              placeholder="Search owners..."
+              placeholder="Search vehicle providers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
@@ -202,6 +214,7 @@ export default function ProfilesPage() {
                 setSelectedTruck(null);
                 setSelectedTrip(null);
                 setIsSidebarOpen(false);
+                console.log('Selected provider:', { id: owner.id, full_name: owner.full_name, role: owner.role });
               }}
             >
               <div className="flex items-center">
@@ -223,11 +236,17 @@ export default function ProfilesPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <UserCircle className="mr-2" size={16} />
-                    {owner.full_name}
+                    <div className="flex items-center">
+                      {owner.full_name}
+                      <Badge
+                        variant="default"
+                        className={`ml-2 text-xs ${owner.role === 'truck_owner' ? 'bg-blue-500' : 'bg-green-500'} text-white`}
+                      >
+                        {owner.role === 'truck_owner' ? 'Owner | ' : 'Agent | '}
+                        {getOwnerTrucks(owner.id).length} 🚚 
+                      </Badge>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {getOwnerTrucks(owner.id).length}T {getTruckTrips(getOwnerTrucks(owner.id).map(t => t.id).join(',')).length}P
-                  </Badge>
                 </div>
               </li>
             ))}
@@ -256,7 +275,7 @@ export default function ProfilesPage() {
         )}
 
         {/* Main Content */}
-        <main className={`flex-1 p-6 ${isSidebarOpen ? 'md:ml-64' : 'ml-0'}`}>
+        <main className={`flex-1 p-6 ${isSidebarOpen ? 'md:ml-80' : 'ml-0'}`}>
           {isSidebarOpen && (
             <div className="md:hidden fixed top-0 left-0 w-full h-12 bg-white z-50 flex items-center justify-between px-4">
               <Button
@@ -315,9 +334,10 @@ export default function ProfilesPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p><strong>Phone:</strong> {selectedOwner.phone}</p>
-                    <p><strong>ID Type:</strong> {selectedOwner.truck_owners?.aadhaar_or_pan || 'N/A'}</p>
-                    <p><strong>City:</strong> {selectedOwner.truck_owners?.town_city || 'N/A'}</p>
+                    <p><strong>ID Type:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners?.aadhaar_or_pan || 'N/A') : 'N/A'}</p>
+                    <p><strong>City:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners?.town_city || 'N/A') : 'N/A'}</p>
                     <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
+                    <p><strong>Role:</strong> {selectedOwner.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
                   </CardContent>
                 </Card>
 

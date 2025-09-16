@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,9 @@ export default function IndentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredTrucks, setFilteredTrucks] = useState<any[]>([]);
   const router = useRouter();
+  const [isAgentPlaced, setIsAgentPlaced] = useState(false); // Checkbox state
+  const [selectedAgentId, setSelectedAgentId] = useState(''); // Selected agent UUID
+  const [agents, setAgents] = useState<any[]>([]); // List of truck agents
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,6 +119,15 @@ export default function IndentsPage() {
         .from('indents')
         .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
         .order('created_at', { ascending: false });
+        console.log('Fetched indents:', i?.length || 0); // Debug log
+        const { data: a, error: agentError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'truck_agent')
+          .order('full_name', { ascending: true });
+        console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
+        if (agentError) console.error('Error fetching agents:', agentError.message);
+        setAgents(a || []);
       if (indentError) {
         console.error('Error fetching indents:', indentError.message);
         setError('Failed to load indents.');
@@ -123,10 +136,11 @@ export default function IndentsPage() {
       setIndents(i || []);
       const { data: t, error: truckError } = await supabase
         .from('trucks')
-        .select('vehicle_number, vehicle_type')
+        .select('vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(full_name)')
         .eq('active', true)
         .order('vehicle_number', { ascending: true });
-      console.log('Fetched trucks:', t); // Debug log
+      console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
+      console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
       if (truckError) {
         console.error('Error fetching trucks:', truckError.message);
         setError('Failed to load trucks.');
@@ -146,9 +160,9 @@ useEffect(() => {
   if (searchTerm) {
     const filtered = trucks.filter(t =>
       t.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    console.log('Filtered trucks:', filtered); // Debug log
+      t.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+      console.log('Filtered trucks count:', filtered.length, 'Results:', filtered.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
     setFilteredTrucks(filtered);
   } else {
     setFilteredTrucks(trucks);
@@ -430,10 +444,25 @@ useEffect(() => {
       if (newStatus === 'accepted' && vehicleNumber && driverPhone) {
         payload.vehicle_number = vehicleNumber;
         payload.driver_phone = driverPhone;
+        console.log('Creating trip with:', { indent_id: selectedIndentId, vehicleNumber, isAgentPlaced, selectedAgentId }); // Debug log
+        const selectedTruck = trucks.find(t => t.vehicle_number === vehicleNumber);
+        if (!selectedTruck) {
+          console.error('Selected truck not found:', vehicleNumber);
+          setError('Selected vehicle not found.');
+          return;
+        }
+        const truckProviderId = isAgentPlaced && selectedAgentId ? selectedAgentId : selectedTruck.owner_id;
+        console.log('Assigning truck_provider_id:', truckProviderId, 'Truck ID:', selectedTruck.id); // Debug log
         // Create trip with client_cost and short_id
         const { data: trip, error: tripError } = await supabase
           .from('trips')
-          .insert({ indent_id: selectedIndentId, client_cost: currentIndent.client_cost, short_id: currentIndent.short_id })
+          .insert({
+            indent_id: selectedIndentId,
+            client_cost: currentIndent.client_cost,
+            short_id: currentIndent.short_id,
+            truck_id: selectedTruck.id,
+            truck_provider_id: truckProviderId
+          })
           .select('id')
           .single();
         if (tripError) {
@@ -604,6 +633,12 @@ useEffect(() => {
       }
       if (!driverPhone || !/^\d{10}$/.test(driverPhone)) {
         return 'Please enter a valid 10-digit driver phone number.';
+      }
+      if (isAgentPlaced && !selectedAgentId) {
+        return 'Please select an agent when vehicle is placed by agent.';
+      }
+      if (isAgentPlaced && !agents.some(a => a.id === selectedAgentId)) {
+        return 'Selected agent is not valid.';
       }
     }
     return null;
@@ -961,6 +996,8 @@ useEffect(() => {
             setNewStatus(e.target.value);
             setVehicleNumber('');
             setDriverPhone('');
+            setIsAgentPlaced(false); // Reset checkbox
+            setSelectedAgentId(''); // Reset agent selection
             setIsNewStatusSelected(e.target.value !== (indents.find(i => i.id === selectedIndentId)?.status || ''));
           }}
           disabled={loading}
@@ -980,7 +1017,7 @@ useEffect(() => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search vehicle number or type..."
+              placeholder="Search vehicle number or type or owner/agent name..."
               className="w-full border rounded p-2 mb-2"
               autoComplete="off"
             />
@@ -992,17 +1029,29 @@ useEffect(() => {
                       key={t.vehicle_number}
                       className="p-2 hover:bg-gray-100 cursor-pointer"
                       onClick={() => {
-                        console.log('Selecting vehicle:', t.vehicle_number); // Debug log
+                        // console.log('Selecting vehicle:', t.vehicle_number); // Debug log
+                        console.log('Selected vehicle details:', {
+                          vehicle_number: t.vehicle_number,
+                          vehicle_type: t.vehicle_type,
+                          owner_name: t.profiles?.full_name || 'Unknown'
+                        });
                         setVehicleNumber(t.vehicle_number);
                         setSearchTerm('');
                         setStatusModalOpen(true); // Ensure modal stays open
                       }}
                     >
-                      {t.vehicle_number} ({t.vehicle_type})
+                      {/* {t.vehicle_number} ({t.vehicle_type}) */}
+                      {t.vehicle_number} ({t.vehicle_type}, {t.profiles?.full_name || 'Unknown'})
                     </div>
                   ))
                 ) : (
-                  <div className="p-2 text-gray-500">No matching vehicles found.</div>
+                  // <div className="p-2 text-gray-500">No matching vehicles found.</div>
+                  <div className="p-2 text-gray-500">
+                    No matching vehicles found.{' '}
+                    <Link href="/trucks" className="text-blue-600 hover:underline" onClick={() => setStatusModalOpen(false)}>
+                      Add a new vehicle
+                    </Link>.
+                  </div>
                 )}
               </div>
             )}
@@ -1019,6 +1068,46 @@ useEffect(() => {
               disabled={loading}
             />
           </div>
+          <div>
+            <Label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isAgentPlaced}
+                onChange={(e) => {
+                  setIsAgentPlaced(e.target.checked);
+                  console.log('Agent placed checkbox:', e.target.checked); // Debug log
+                  if (!e.target.checked) setSelectedAgentId(''); // Reset agent if unchecked
+                }}
+                disabled={loading || !vehicleNumber}
+                className="mr-2"
+              />                      Vehicle placed by agent
+            </Label>
+          </div>
+          {isAgentPlaced && (
+            <div>
+              <Label>Select Agent</Label>
+              <select
+                className="w-full border rounded p-2"
+                value={selectedAgentId}
+                onChange={(e) => {
+                  setSelectedAgentId(e.target.value);
+                  console.log('Selected agent ID:', e.target.value); // Debug log
+                }}
+                disabled={loading}
+              >
+                <option value="">Select an agent</option>
+                {agents.length > 0 ? (
+                  agents.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.full_name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No agents available</option>
+                )}
+              </select>
+            </div>
+          )}
         </>
       )}
       <div>

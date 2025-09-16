@@ -303,9 +303,9 @@ export default function TrucksPage() {
           <div className="grid md:grid-cols-2 gap-3">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <Label>Truck Owner</Label>
+                <Label>Truck Owner / Agent</Label>
                 <Link href="/truck-owners?returnTo=/trucks" className="text-blue-600 hover:underline text-sm">
-                  Missing Owner? Add here
+                  Missing Name? Add here
                 </Link>
               </div>
               <select

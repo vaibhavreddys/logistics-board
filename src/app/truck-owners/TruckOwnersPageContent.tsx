@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Navbar from '@/components/ui/Navbar';
 import { User, CreditCard, Phone, X } from 'lucide-react';
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -20,6 +21,7 @@ interface TruckOwnerForm {
   bank_ifsc_code: string;
   upi_id: string;
   town_city: string;
+  role: 'truck_owner' | 'truck_agent' | '';
 }
 
 export default function TruckOwnersPage() {
@@ -29,7 +31,7 @@ export default function TruckOwnersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo') || '/trucks';
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TruckOwnerForm>({
+  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<TruckOwnerForm>({
     defaultValues: {
       full_name: '',
       phone: '',
@@ -38,6 +40,7 @@ export default function TruckOwnersPage() {
       bank_ifsc_code: '',
       upi_id: '',
       town_city: '',
+      role: '', // Empty default value for role
     }
   });
 
@@ -81,6 +84,7 @@ export default function TruckOwnersPage() {
         ...data,
         bank_ifsc_code: data.bank_ifsc_code.trim() === '' ? null : data.bank_ifsc_code,
       };
+      console.log('Processed data for API:', processedData); // Additional debug log
       const response = await fetch('/api/truck-owners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,8 +100,10 @@ export default function TruckOwnersPage() {
       if (!userId) {
         throw new Error('No user ID returned');
       }
-      setSuccess('Truck owner added successfully!');
-      reset();
+      // Format role for display (e.g., "truck_owner" -> "truck owner")
+      const formattedRole = data.role.replace('_', ' ');
+      setSuccess(`Added ${data.full_name} as a ${formattedRole} successfully!`);
+      reset(); // Reset form after successful submission
       setTimeout(() => {
         router.push(`${returnTo}?newOwnerId=${userId}`);
       }, 2000);
@@ -131,7 +137,7 @@ export default function TruckOwnersPage() {
         )}
         <Card>
           <CardHeader>
-            <CardTitle>Add Truck Owner</CardTitle>
+            <CardTitle>Add Truck Owner / Agent</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit(handleAddTruckOwner)} className="space-y-4">
@@ -186,6 +192,28 @@ export default function TruckOwnersPage() {
                     />
                     {errors.aadhaar_or_pan && <p className="text-red-500 text-sm">{errors.aadhaar_or_pan.message}</p>}
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select
+                    onValueChange={(value) => setValue('role', value as 'truck_owner' | 'truck_agent', { shouldValidate: true })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="truck_owner">Truck Owner</SelectItem>
+                      <SelectItem value="truck_agent">Truck Agent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <input
+                    type="hidden"
+                    {...register('role', {
+                      required: 'Role is required',
+                      validate: (value) => ['truck_owner', 'truck_agent'].includes(value) || 'Invalid role selected',
+                    })}
+                  />
+                  {errors.role && <p className="text-red-500 text-sm">{errors.role.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="town_city">Town/City</Label>
@@ -243,7 +271,7 @@ export default function TruckOwnersPage() {
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Adding...' : 'Add Truck Owner'}
+                {loading ? 'Adding...' : 'Add Truck Owner/Agent'}
               </Button>
             </form>
           </CardContent>

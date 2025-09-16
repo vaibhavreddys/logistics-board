@@ -1,0 +1,43 @@
+--- a/src/app/profiles/page.tsx
++++ b/src/app/profiles/page.tsx
+@@ -190,15 +190,22 @@
+             >
+               <div className="flex items-center">
+                 <UserCircle className="mr-2" size={16} />
+                 My Profile
+               </div>
+             </li>
+             {filteredOwners.map(owner => (
+               <li
+                 key={owner.id}
+                 className={`p-2 rounded cursor-pointer hover:bg-gray-200 ${selectedOwner?.id === owner.id && !selectedTruck && !selectedTrip ? 'bg-blue-100' : ''}`}
+                 onClick={() => {
+                   setSelectedOwner(owner);
+                   setSelectedTruck(null);
+                   setSelectedTrip(null);
+                   setIsSidebarOpen(false);
++                  console.log('Selected provider:', { id: owner.id, full_name: owner.full_name, role: owner.role }); // Debug log
+                 }}
+               >
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center">
+                     <UserCircle className="mr-2" size={16} />
+-                    {owner.full_name}
++                    <div className="flex items-center">
++                      {owner.full_name}
++                      <Badge
++                        variant="default"
++                        className={`ml-2 text-xs ${owner.role === 'truck_owner' ? 'bg-blue-500' : 'bg-green-500'} text-white`}
++                      >
++                        {owner.role === 'truck_owner' ? 'Owner' : 'Agent'}
++                      </Badge>
++                    </div>
+                   </div>
+                   <Badge variant="secondary" className="text-xs">
+                     {getOwnerTrucks(owner.id).length} 🚚
+                   </Badge>
+                 </div>
+               </li>
+             ))}
+           </ul>
+         </aside>
