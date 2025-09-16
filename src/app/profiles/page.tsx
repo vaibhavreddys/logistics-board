@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import Navbar from '@/components/ui/Navbar';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import { Users, Truck, Route, FileText, Search, Bell, UserCircle, ChevronLeft, Menu } from 'lucide-react';
+import { Users, Truck, Route, FileText, Search, Bell, UserCircle, UserRound, ChevronLeft, Menu } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -218,7 +218,7 @@ export default function ProfilesPage() {
               }}
             >
               <div className="flex items-center">
-                <UserCircle className="mr-2" size={16} />
+                <UserRound className="mr-2" size={16} />
                 My Profile
               </div>
             </li>
@@ -235,18 +235,18 @@ export default function ProfilesPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <UserCircle className="mr-2" size={16} />
-                    <div className="flex items-center">
-                      {owner.full_name}
-                      <Badge
-                        variant="default"
-                        className={`ml-2 text-xs ${owner.role === 'truck_owner' ? 'bg-blue-500' : 'bg-green-500'} text-white`}
-                      >
-                        {owner.role === 'truck_owner' ? 'Owner | ' : 'Agent | '}
-                        {getOwnerTrucks(owner.id).length} 🚚 
-                      </Badge>
-                    </div>
+                    {owner.role === 'truck_owner' ? (
+                      <Truck className="mr-2" size={16} />
+                    ) : (
+                      <UserCircle className="mr-2" size={16} />
+                    )}
+                    {owner.full_name}
                   </div>
+                  <Badge variant="secondary" 
+                    className={`ml-2 text-xs hover:bg-black-200 ${owner.role === 'truck_owner' ? 'bg-blue-500' : 'bg-green-500'} text-white`}
+                  >
+                    {getOwnerTrucks(owner.id).length} 🚚
+                  </Badge>
                 </div>
               </li>
             ))}
