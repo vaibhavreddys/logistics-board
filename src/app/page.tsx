@@ -4,8 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Phone } from 'lucide-react';
-import { MessageCircle } from 'lucide-react'; // Icon for WhatsApp
+import { Phone, MessageCircle } from 'lucide-react';
 import Navbar from '@/components/ui/Navbar';
 import { Button } from "@/components/ui/button";
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -63,6 +62,27 @@ const formatDateDDMonthYYYY = (date: string): string => {
   }
 };
 
+// Function to determine the section for an indent based on created_at
+const getSection = (createdAt: string): string => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Start of today
+  const indentDate = new Date(createdAt);
+  const diffTime = today.getTime() - indentDate.getTime();
+  const diffDays = diffTime / (1000 * 3600 * 24);
+
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  if (indentDate >= today) {
+    return 'Posted Today';
+  } else if (indentDate >= startOfWeek) {
+    return 'Posted This Week';
+  } else {
+    return 'Everything Before That';
+  }
+};
+
 export default function LoadBoard() {
   const [indents, setIndents] = useState<Indent[]>([]);
   const [q, setQ] = useState('');
@@ -74,7 +94,7 @@ export default function LoadBoard() {
           .from('indents')
           .select('*')
           .eq('status', 'open')
-          .order('pickup_at');
+          .order('created_at', { ascending: false }); // Sort by created_at descending
         if (error) {
           console.error('Error fetching indents:', error.message);
           return;
@@ -92,10 +112,10 @@ export default function LoadBoard() {
         setIndents(prev => {
           const row = payload.new as Indent;
           if (payload.eventType === 'INSERT' && row.status === 'open') {
-            return [row, ...prev];
+            return [row, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           } else if (payload.eventType === 'UPDATE') {
             if (row.status === 'open') {
-              return prev.map(i => (i.id === row.id ? row : i));
+              return prev.map(i => (i.id === row.id ? row : i)).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             } else {
               return prev.filter(i => i.id !== row.id);
             }
@@ -117,6 +137,22 @@ export default function LoadBoard() {
     );
   }, [q, indents]);
 
+  // Group indents by section
+  const groupedIndents = useMemo(() => {
+    const groups: { [key: string]: Indent[] } = {
+      'Posted Today': [],
+      'Posted This Week': [],
+      'Everything Before That': [],
+    };
+
+    filtered.forEach(indent => {
+      const section = getSection(indent.created_at);
+      groups[section].push(indent);
+    });
+
+    return groups;
+  }, [filtered]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
       <Navbar />
@@ -132,86 +168,88 @@ export default function LoadBoard() {
             />
           </div>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(i => (
-            <Card key={i.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-xl">
-              {/* Header */}
-              <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex justify-between">
-                <h2 className="text-lg font-semibold self-start">{i.origin} → {i.destination}</h2>
-                <span className="text-xl font-bold self-start">{`₹${Number(i.trip_cost).toLocaleString()}`}</span>
-              </CardHeader>
-
-              {/* Content */}
-              <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-gray-500 w-6 flex-shrink-0">🚚</span>
-                    <span className="w-20 font-medium flex-shrink-0">Vehicle:</span>
-                    <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
-                      {i.vehicle_type}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-gray-500 w-6 flex-shrink-0">📦</span>
-                    <span className="w-20 font-medium flex-shrink-0">Load:</span>
-                    <span className="font-semibold">{i.load_material || "—"} {i.load_weight_kg ? `${i.load_weight_kg} MT` : ""}</span>
-                  </div>
-                  
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
-                    <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
-                    <span>{formatDateDDMMYYYY(i.pickup_at)}</span>
-                  </div>
-                  
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
-                    <span className="w-20 font-medium flex-shrink-0">TAT:</span>
-                    <span>{i.tat_hours}h</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-gray-500 w-6 flex-shrink-0">🆔</span>
-                    <span className="w-20 font-medium flex-shrink-0">Load ID:</span>
-                    <span className="font-bold text-black-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
-                      {i.short_id}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-                    onClick={() => window.location.href = `tel:${i.contact_phone}`}
-                  >
-                    <Phone size={18} /> Contact
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"
-                    onClick={() => {
-                      const loadDetails = [
-                        `Load ID: *${i.short_id}*`,
-                        `Route: ${i.origin} → ${i.destination}`,
-                        `Vehicle: ${i.vehicle_type}`,
-                        i.load_material ? `Material: ${i.load_material}` : null,
-                        i.load_weight_kg ? `Weight: ${i.load_weight_kg} MT` : null,
-                        `Pickup: ${formatDateDDMMYYYY(i.pickup_at)}`,
-                      ]
-                        .filter(Boolean) // Remove null/undefined values
-                        .join('\n'); // Join with newlines for WhatsApp formatting
-
-                      const message = encodeURIComponent(`Hello,\nI'm interested in this load:\n\n${loadDetails}`);
-                      window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`, '_blank');
-                    }}
-                  >
-                    <MessageCircle size={18} /> WhatsApp
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {['Posted Today', 'Posted This Week', 'Everything Before That'].map(section => (
+          groupedIndents[section].length > 0 && (
+            <div key={section} className="space-y-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-gray-800">{section}</h2>
+                <div className="flex-1 h-px bg-gray-300"></div>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groupedIndents[section].map(i => (
+                  <Card key={i.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-xl">
+                    <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex justify-between">
+                      <h2 className="text-lg font-semibold self-start">{i.origin} → {i.destination}</h2>
+                      <span className="text-xl font-bold self-start">{`₹${Number(i.trip_cost).toLocaleString()}`}</span>
+                    </CardHeader>
+                    <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
+                      <div className="space-y-3 text-sm text-gray-700">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">🚚</span>
+                          <span className="w-20 font-medium flex-shrink-0">Vehicle:</span>
+                          <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
+                            {i.vehicle_type}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">📦</span>
+                          <span className="w-20 font-medium flex-shrink-0">Load:</span>
+                          <span className="font-semibold">{i.load_material || "—"} {i.load_weight_kg ? `${i.load_weight_kg} MT` : ""}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
+                          <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
+                          <span>{formatDateDDMMYYYY(i.pickup_at)}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
+                          <span className="w-20 font-medium flex-shrink-0">TAT:</span>
+                          <span>{i.tat_hours}h</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">🆔</span>
+                          <span className="w-20 font-medium flex-shrink-0">Load ID:</span>
+                          <span className="font-bold text-black-700 bg-blue-100 px-2 py-0.5 rounded-md inline-flex items-center h-6">
+                            {i.short_id}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="default"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                          onClick={() => window.location.href = `tel:${i.contact_phone}`}
+                        >
+                          <Phone size={18} /> Contact
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"
+                          onClick={() => {
+                            const loadDetails = [
+                              `Load ID: *${i.short_id}*`,
+                              `Route: ${i.origin} → ${i.destination}`,
+                              `Vehicle: ${i.vehicle_type}`,
+                              i.load_material ? `Material: ${i.load_material}` : null,
+                              i.load_weight_kg ? `Weight: ${i.load_weight_kg} MT` : null,
+                              `Pickup: ${formatDateDDMMYYYY(i.pickup_at)}`,
+                            ]
+                              .filter(Boolean)
+                              .join('\n');
+                            const message = encodeURIComponent(`Hello,\nI'm interested in this load:\n\n${loadDetails}`);
+                            window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`, '_blank');
+                          }}
+                        >
+                          <MessageCircle size={18} /> WhatsApp
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )
+        ))}
       </main>
     </div>
   );

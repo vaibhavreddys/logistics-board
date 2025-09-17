@@ -1022,7 +1022,7 @@ useEffect(() => {
 
                 {/* Buttons + Status fixed at bottom */}
                 <div className="mt-auto pt-4 flex justify-between items-end">
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 mr-1">
                     {i.status !== 'cancelled' && (
                       <Button
                         variant="outline"
@@ -1039,9 +1039,10 @@ useEffect(() => {
                           setIsNewStatusSelected(false);
                         }}
                       >
-                        <span className="flex items-center">
+                        {/* <span className="flex items-center">
                           <span className="hidden sm:inline">Update Status</span>
-                        </span>
+                        </span> */}
+                        Update Status
                       </Button>
                     )}
                     <Button
@@ -1053,7 +1054,7 @@ useEffect(() => {
                     >
                       <span className="flex items-center">
                         <History size={16} className="mr-1" />
-                        <span className="hidden sm:inline">View</span> History
+                        {/* <span className="hidden sm:inline">View History</span> */}
                       </span>
                     </Button>
                     {i.status !== 'cancelled' && (
@@ -1093,11 +1094,10 @@ useEffect(() => {
 
                           const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
                           const message = encodeURIComponent(`Hello,\nCheckout this load\n\nInterested? Chat here: https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${subMessage}\n\nFind more loads at https://logistics-board.vercel.app/\n\n`);
-                          // window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`, '_blank');
                           setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
                         }}
                       >
-                        <MessageCircle size={16} className="mr-1" />
+                        <MessageCircle size={16} />
                         <span className="hidden sm:inline">Share</span>
                       </Button>
                     )}
@@ -1109,7 +1109,6 @@ useEffect(() => {
                         <img src={imageSrc} alt="Load Details" style={{ maxWidth: '100%', maxHeight: '90vh' }} />
                         <span>Copy the image first and then click on "WhatsApp" button, paste the image before sending the message on WhatsApp.</span><br></br>
                         <span>The message will be sent to the person who created the indent, you can forward it to the vehicle provider's groups.</span><br></br>
-                        {/* <span>This limitation will be fixed after we integrate WhatsApp For Business API.</span> */}
                         <div className="mt-4 flex justify-between items-center">
                           <button
                             onClick={() => setImageSrc(null)}
