@@ -17,6 +17,7 @@ function NavLinks({
   onNavigate,
   handleLogout,
   handleLogin,
+  isMenuOpen,
 }: {
   isLoggedIn: boolean;
   userRole: string | null;
@@ -24,6 +25,7 @@ function NavLinks({
   onNavigate: (href: string, e?: React.MouseEvent) => void;
   handleLogout: () => Promise<void>;
   handleLogin: () => void;
+  isMenuOpen: boolean;
 }) {
   const searchParams = useSearchParams();
   const isLoadPage = pathname === '/load' && searchParams.get('id');
@@ -126,7 +128,7 @@ function NavLinks({
               ) : isLoadPage ? (
                 <a
                   href="/"
-                  className="block bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow Jewel transition-all w-full text-center"
+                  className="block bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full text-center"
                   onClick={(e) => onNavigate('/', e)}
                 >
                   Load Board
@@ -220,6 +222,7 @@ export default function Navbar() {
             onNavigate={onNavigate}
             handleLogout={handleLogout}
             handleLogin={handleLogin}
+            isMenuOpen={isMenuOpen}
           />
         </Suspense>
       </div>
