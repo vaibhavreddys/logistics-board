@@ -62,6 +62,29 @@ const formatDateDDMonthYYYY = (date: string): string => {
   }
 };
 
+// Function to format time since posted
+const formatAge = (createdAt: string): string => {
+  try {
+    const now = new Date();
+    const posted = new Date(createdAt);
+    if (isNaN(posted.getTime())) return 'Unknown';
+    const diffMs = now.getTime() - posted.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 3600));
+    const diffDays = Math.floor(diffMs / (1000 * 3600 * 24));
+
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
+    } else {
+      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    }
+  } catch {
+    return 'Unknown';
+  }
+};
+
 // Function to determine the section for an indent based on created_at
 const getSection = (createdAt: string): string => {
   const today = new Date();
@@ -200,6 +223,11 @@ export default function LoadBoard() {
                           <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
                           <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
                           <span>{formatDateDDMMYYYY(i.pickup_at)}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-gray-500 w-6 flex-shrink-0">⏳</span>
+                          <span className="w-20 font-medium flex-shrink-0">Posted:</span>
+                          <span>{formatAge(i.created_at)}</span>
                         </div>
                         <div className="flex items-baseline gap-2">
                           <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
