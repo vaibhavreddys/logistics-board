@@ -88,7 +88,7 @@ export default function TrucksPage() {
     if (!form.owner_id) return 'Please select a truck owner.';
     if (!form.vehicle_number || !/^[A-Z0-9-]+$/.test(form.vehicle_number)) return 'Please enter a valid vehicle number (alphanumeric with hyphens).';
     if (!form.vehicle_type) return 'Please select a vehicle type.';
-    if (!form.capacity_kg || Number(form.capacity_kg) <= 0) return 'Please enter a valid capacity (kg).';
+    if (!form.capacity_kg || Number(form.capacity_kg) <= 0) return 'Please enter a valid capacity (MT).';
     return null;
   };
 
@@ -349,7 +349,7 @@ export default function TrucksPage() {
               </select>
             </div>
             <div>
-              <Label>Capacity (kg)</Label>
+              <Label>Capacity (MT)</Label>
               <Input
                 type="number"
                 value={form.capacity_kg}
@@ -396,7 +396,7 @@ export default function TrucksPage() {
                   <div>
                     <div className="font-semibold">{t.vehicle_number}</div>
                     <div className="text-sm">Type: {t.vehicle_type}</div>
-                    <div className="text-sm">Capacity: {t.capacity_kg} kg</div>
+                    <div className="text-sm">Capacity: {t.capacity_kg} MT</div>
                     <div className="text-sm">
                       Owner: <Link href={`/truck-owners/view/${t.owner_id}`} className="text-blue-600 hover:underline">
                         {t.profiles?.full_name || 'Unknown'}

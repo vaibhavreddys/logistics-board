@@ -11,7 +11,7 @@ import Navbar from '@/components/ui/Navbar';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 
-import { X, Pencil, History, Truck, Package, Phone, Calendar, Handshake, MessageSquareText, User, Edit } from 'lucide-react';
+import { X, Pencil, History, Truck, Package, Phone, Calendar, Handshake, MessageSquareText, User, Edit, MessageCircle, MessageCircleCode } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -53,16 +53,22 @@ export default function IndentsPage() {
   const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [agentName, setAgentName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [comments, setComments] = useState('');
   const [isNewStatusSelected, setIsNewStatusSelected] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredTrucks, setFilteredTrucks] = useState<any[]>([]);
+  const [filteredAgents, setFilteredAgents] = useState<any[]>([]);
   const router = useRouter();
   const [isAgentPlaced, setIsAgentPlaced] = useState(false); // Checkbox state
   const [selectedAgentId, setSelectedAgentId] = useState(''); // Selected agent UUID
   const [agents, setAgents] = useState<any[]>([]); // List of truck agents
+  const [agentSearchTerm, setAgentSearchTerm] = useState('');
   const formRef = useRef<HTMLDivElement>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [message, setMessageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -110,6 +116,7 @@ export default function IndentsPage() {
         console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
         if (agentError) console.error('Error fetching agents:', agentError.message);
         setAgents(a || []);
+        setFilteredAgents(a || []);
       if (indentError) {
         console.error('Error fetching indents:', indentError.message);
         setError('Failed to load indents.');
@@ -138,7 +145,7 @@ export default function IndentsPage() {
 }, [router]);
 
 useEffect(() => {
-  console.log('Search term changed:', searchTerm); // Debug log
+  console.log('Truck Search term changed:', searchTerm); // Debug log
   if (searchTerm) {
     const filtered = trucks.filter(t =>
       t.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -150,6 +157,113 @@ useEffect(() => {
     setFilteredTrucks(trucks);
   }
 }, [searchTerm, trucks]);
+
+useEffect(() => {
+  console.log('Agent Search term changed:', agentSearchTerm); // Debug log
+  if (agentSearchTerm) {
+    const filtered = agents.filter(t =>
+      (t?.full_name || '').toLowerCase().includes(agentSearchTerm.toLowerCase()));
+      console.log('Filtered agents count:', filtered.length, 'Results:', filtered.map(t => ({ agent_name: t?.full_name || 'Unknown' }))); // Debug log
+    setFilteredAgents(filtered);
+  } else {
+    setFilteredAgents(agents);
+  }
+}, [agentSearchTerm, agents]);
+
+  interface ImageData {
+    caption: string;
+    rows: Array<{
+      label: string;
+      value: string;
+      isBold?: boolean;
+      fontSize?: number;
+      color?: string;
+    }>;
+  }
+
+  const generateTableImage = async (data: ImageData, setFeedback: (msg: string | null) => void, setImageSrc: (url: string | null) => void) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not available');
+
+      const width = 450; // Increased width for better layout
+      const height = 350; // Adjusted height for more rows and padding
+      canvas.width = width * 2; // High DPI
+      canvas.height = height * 2;
+      ctx.scale(2, 2);
+
+      // Modern Background and Border
+      ctx.fillStyle = '#f9fafb'; // Light gray background
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = '#141617ff'; // Subtle gray border
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 10, width - 20, height - 20);
+
+      // Table Header Styling
+      ctx.fillStyle = '#6051abff'; // Blue header background
+      ctx.fillRect(20, 30, width - 40, 30);
+      ctx.fillStyle = '#ffffff'; // White text for header
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(data.rows[1].value, 30, 50);
+
+      // Table Rows with Dynamic Styling
+      const rowHeight = 30;
+      const startY = 100;
+      let itemCount = 0;
+      data.rows.forEach((row, index) => {
+        console.log(row.label);
+        console.log(row.value);
+        if (row.label === "Route") return;
+        if (row.value === "NA") return;
+        const y = startY + (itemCount++ * rowHeight);
+        const fontSize = row.fontSize || 12;
+        const isBold = itemCount == 0;
+        const color = '#071625ff';
+
+        // Label
+        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSize}px Arial`;
+        ctx.fillStyle = '#0b0b0cff'; // Gray for labels
+        ctx.fillText(row.label, 30, y);
+
+        // Value
+        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSize}px Arial`;
+        ctx.fillStyle = color; // Dynamic color for values
+        ctx.fillText(row.value || '—', 200, y); // Adjusted x for better alignment
+      });
+
+      // Convert to blob and handle display
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/png');
+      });
+
+      if (!blob) throw new Error('Failed to create image blob');
+
+      // This is for laptops
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        setFeedback(`Image copied to clipboard! (Indent: ${data.rows[0].value})`);
+        setTimeout(() => setFeedback(null), 3000);
+      // } else {
+      }
+        // This if mobile phones
+        const url = URL.createObjectURL(blob);
+        console.log(url);
+        setImageSrc(url);
+        if (!(navigator.clipboard && window.isSecureContext)) {
+          setFeedback('Image generated! Long-press to copy.');
+          setTimeout(() => setFeedback(null), 3000);
+        }
+      // }
+
+    } catch (error) {
+      console.error('Error generating table image:', error);
+      setFeedback('Failed to generate image. Please try again.');
+      setTimeout(() => setFeedback(null), 3000);
+    }
+  };
 
   const validateForm = () => {
     if (!form.client_id) return 'Please select a client.';
@@ -511,10 +625,12 @@ useEffect(() => {
       setStatusModalOpen(false);
       setNewStatus('');
       setVehicleNumber('');
+      setAgentName('');
       setDriverPhone('');
       setComments('');
       setIsNewStatusSelected(false);
       setSearchTerm('');
+      setAgentSearchTerm('');
     } catch (err) {
       console.error('Error updating status:', err);
       setError('Failed to update indent status. Please try again.');
@@ -613,8 +729,8 @@ useEffect(() => {
       if (!trucks.some(t => t.vehicle_number === vehicleNumber)) {
         return 'Selected vehicle number is not available.';
       }
-      if (!driverPhone || !/^\d{10}$/.test(driverPhone)) {
-        return 'Please enter a valid 10-digit driver phone number.';
+      if (!driverPhone || !/^[6-9]\d{9}$/.test(driverPhone)) {
+        return 'Please enter a valid 10-digit driver phone number, it should start between 6-9 and contain only 10 digits';
       }
       if (isAgentPlaced && !selectedAgentId) {
         return 'Please select an agent when vehicle is placed by agent.';
@@ -907,7 +1023,7 @@ useEffect(() => {
                 {/* Buttons + Status fixed at bottom */}
                 <div className="mt-auto pt-4 flex justify-between items-end">
                   <div className="flex gap-3">
-                    {i.status !== 'accepted' && (
+                    {i.status !== 'cancelled' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -916,6 +1032,7 @@ useEffect(() => {
                           setSelectedIndentId(i.id);
                           setNewStatus(i.status);
                           setVehicleNumber(i.vehicle_number || "");
+                          setAgentName(i.full_name || "")
                           setDriverPhone(i.driver_phone || "");
                           setComments(i.notes || "");
                           setStatusModalOpen(true);
@@ -923,7 +1040,7 @@ useEffect(() => {
                         }}
                       >
                         <span className="flex items-center">
-                          <span className="hidden sm:inline">Update</span> Status
+                          <span className="hidden sm:inline">Update Status</span>
                         </span>
                       </Button>
                     )}
@@ -939,7 +1056,7 @@ useEffect(() => {
                         <span className="hidden sm:inline">View</span> History
                       </span>
                     </Button>
-                    {i.status !== 'accepted' && (
+                    {i.status !== 'cancelled' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -952,6 +1069,80 @@ useEffect(() => {
                         </span>
                       </Button>
                     )}
+                    {i.status !== 'cancelled' && i.status !== 'accepted' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-green-600 border-green-600 hover:bg-green-50"
+                        onClick={async () => {
+                          const loadDetails = {
+                            caption: `Checkout this load ${i.short_id}`,
+                            rows: [
+                              { label: 'Load ID', value: i.short_id },
+                              { label: 'Route', value: `${i.origin} ⮕ ${i.destination}`, isBold: true, fontSize: 14 },
+                              { label: 'Vehicle', value: i.vehicle_type || 'NA' },
+                              { label: 'Load', value: i.load_weight_kg ? `${i.load_weight_kg} MT` : 'NA'},
+                              { label: 'Material', value: `${i.load_material || ''}`.trim() || 'NA' },
+                              { label: 'Placement At', value: i.pickup_at ? new Date(i.pickup_at).toLocaleString() : 'NA' },
+                              { label: 'Client', value: i.clients?.name || 'NA' },
+                              { label: 'Trip Cost', value: i.trip_cost ? `₹${i.trip_cost}` : 'NA' },
+                            ],
+                          };
+                          console.log(loadDetails);
+                          await generateTableImage(loadDetails, setFeedback, setImageSrc);
+
+                          const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
+                          const message = encodeURIComponent(`Hello,\nCheckout this load\n\nInterested? Chat here: https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${subMessage}\n\nFind more loads at https://logistics-board.vercel.app/\n\n`);
+                          // window.open(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`, '_blank');
+                          setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
+                        }}
+                      >
+                        <MessageCircle size={16} className="mr-1" />
+                        <span className="hidden sm:inline">Share</span>
+                      </Button>
+                    )}
+
+                  {/* // Add modal to display the image */}
+                  {imageSrc && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                      <div className="bg-white p-4 rounded-lg">
+                        <img src={imageSrc} alt="Load Details" style={{ maxWidth: '100%', maxHeight: '90vh' }} />
+                        <span>Copy the image first and then click on "WhatsApp" button, paste the image before sending the message on WhatsApp.</span><br></br>
+                        <span>The message will be sent to the person who created the indent, you can forward it to the vehicle provider's groups.</span><br></br>
+                        {/* <span>This limitation will be fixed after we integrate WhatsApp For Business API.</span> */}
+                        <div className="mt-4 flex justify-between items-center">
+                          <button
+                            onClick={() => setImageSrc(null)}
+                            className="bg-blue-500 text-white px-4 py-2 rounded flex-1"
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (message) {
+                                console.log("Clicked WhatsApp button")
+                                window.open(message);
+                                // setMessageUrl(null);
+                              } else {
+                                setFeedback('Please generate the image first to set the message.');
+                                setTimeout(() => setFeedback(null), 3000);
+                              }
+                            }}
+                            className="bg-green-500 text-white px-4 py-2 rounded flex-1 flex items-center justify-center"
+                          >
+                            <MessageCircleCode size={16} className="mr-1" />
+                            <span>WhatsApp</span> {/* Removed hidden sm:inline to always show text */}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {feedback && (
+                    <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+                      {feedback}
+                    </div>
+                  )}
                   </div>
                   <span className="px-2 py-0.5 bg-blue-200 text-blue-900 rounded-lg text-lg font-semibold shadow-md">
                     {formatStatus(i.status, "")}
@@ -978,6 +1169,7 @@ useEffect(() => {
             setNewStatus(e.target.value);
             setVehicleNumber('');
             setDriverPhone('');
+            setAgentName('');
             setIsAgentPlaced(false); // Reset checkbox
             setSelectedAgentId(''); // Reset agent selection
             setIsNewStatusSelected(e.target.value !== (indents.find(i => i.id === selectedIndentId)?.status || ''));
@@ -997,8 +1189,13 @@ useEffect(() => {
             <Label>Vehicle Number</Label>
             <Input
               type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm || vehicleNumber || ''} // Display selected value if no search term
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                if (vehicleNumber && !e.target.value.startsWith(vehicleNumber)) {
+                  setVehicleNumber(''); // Clear selection if user starts typing something else
+                }
+              }}
               placeholder="Search vehicle number or type or owner/agent name..."
               className="w-full border rounded p-2 mb-2"
               autoComplete="off"
@@ -1011,7 +1208,6 @@ useEffect(() => {
                       key={t.vehicle_number}
                       className="p-2 hover:bg-gray-100 cursor-pointer"
                       onClick={() => {
-                        // console.log('Selecting vehicle:', t.vehicle_number); // Debug log
                         console.log('Selected vehicle details:', {
                           vehicle_number: t.vehicle_number,
                           vehicle_type: t.vehicle_type,
@@ -1019,15 +1215,13 @@ useEffect(() => {
                         });
                         setVehicleNumber(t.vehicle_number);
                         setSearchTerm('');
-                        setStatusModalOpen(true); // Ensure modal stays open
+                        setStatusModalOpen(true);
                       }}
                     >
-                      {/* {t.vehicle_number} ({t.vehicle_type}) */}
                       {t.vehicle_number} ({t.vehicle_type}, {t.profiles?.full_name || 'Unknown'})
                     </div>
                   ))
                 ) : (
-                  // <div className="p-2 text-gray-500">No matching vehicles found.</div>
                   <div className="p-2 text-gray-500">
                     No matching vehicles found.{' '}
                     <Link href="/trucks" className="text-blue-600 hover:underline" onClick={() => setStatusModalOpen(false)}>
@@ -1037,17 +1231,15 @@ useEffect(() => {
                 )}
               </div>
             )}
-            <div className="mt-2 text-gray-700">
-              Selected Vehicle: {vehicleNumber || 'None'}
-            </div>
           </div>
           <div>
             <Label>Driver Phone</Label>
             <Input
               type="text"
               value={driverPhone}
-              onChange={e => setDriverPhone(e.target.value)}
+              onChange={e => {setError(null); setDriverPhone(e.target.value);}}
               disabled={loading}
+              maxLength={10}
             />
           </div>
           <div>
@@ -1058,7 +1250,10 @@ useEffect(() => {
                 onChange={(e) => {
                   setIsAgentPlaced(e.target.checked);
                   console.log('Agent placed checkbox:', e.target.checked); // Debug log
-                  if (!e.target.checked) setSelectedAgentId(''); // Reset agent if unchecked
+                  if (!e.target.checked) {
+                    setSelectedAgentId(''); // Reset agent if unchecked
+                    setAgentName('');
+                  }
                 }}
                 disabled={loading || !vehicleNumber}
                 className="mr-2"
@@ -1068,26 +1263,49 @@ useEffect(() => {
           {isAgentPlaced && (
             <div>
               <Label>Select Agent</Label>
-              <select
-                className="w-full border rounded p-2"
-                value={selectedAgentId}
-                onChange={(e) => {
-                  setSelectedAgentId(e.target.value);
-                  console.log('Selected agent ID:', e.target.value); // Debug log
-                }}
-                disabled={loading}
-              >
-                <option value="">Select an agent</option>
-                {agents.length > 0 ? (
-                  agents.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.full_name}
-                    </option>
+              <Input
+              type="text"
+              value={agentSearchTerm || agentName || ''} // Display selected value if no search term
+              onChange={(e) => {
+                setAgentSearchTerm(e.target.value);
+                if (agentName && !e.target.value.startsWith(agentName)) {
+                  setAgentName(''); // Clear selection if user starts typing something else
+                }
+              }}
+              placeholder="Search agent name..."
+              className="w-full border rounded p-2 mb-2"
+              autoComplete="off"
+            />
+            {agentSearchTerm && (
+              <div className="border rounded max-h-40 overflow-y-auto bg-white shadow-md z-10">
+                {filteredAgents.length > 0 ? (
+                  filteredAgents.map(t => (
+                    <div
+                      key={t.full_name}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                      onClick={() => {
+                        console.log('Selected agent name:', {
+                          agent_name: t.full_name
+                        });
+                        setAgentName(t.full_name);
+                        setSelectedAgentId(t.id);
+                        setAgentSearchTerm('');
+                        setStatusModalOpen(true);
+                      }}
+                    >
+                      {t?.full_name || 'Unknown'}
+                    </div>
                   ))
                 ) : (
-                  <option value="" disabled>No agents available</option>
+                  <div className="p-2 text-gray-500">
+                    No agent found.{' '}
+                    <Link href="/truck-owners?returnTo=/indents" className="text-blue-600 hover:underline" onClick={() => setStatusModalOpen(false)}>
+                      Add a new agent
+                    </Link>.
+                  </div>
                 )}
-              </select>
+              </div>
+            )}
             </div>
           )}
         </>
