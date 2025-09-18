@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,12 @@ interface TruckOwnerDetails {
 }
 
 interface TruckOwner extends Profile {
-  truck_owners?: TruckOwnerDetails; // Nested object for relation
+  truck_owners: TruckOwnerDetails[]; // Nested object for relation
+  aadhaar_or_pan: string;
+  bank_account_number: string | null;
+  bank_ifsc_code: string | null;
+  upi_id: string | null;
+  town_city: string | null;
 }
 
 interface Truck {
@@ -227,6 +232,8 @@ export default function ProfilesPage() {
                 key={owner.id}
                 className={`p-2 rounded cursor-pointer hover:bg-gray-200 ${selectedOwner?.id === owner.id && !selectedTruck && !selectedTrip ? 'bg-blue-100' : ''}`}
                 onClick={() => {
+                  console.log("Setting owner")
+                  console.log(owner)
                   setSelectedOwner(owner);
                   setSelectedTruck(null);
                   setSelectedTrip(null);
@@ -301,6 +308,16 @@ export default function ProfilesPage() {
                 <p><strong>Role:</strong> {adminProfile?.role || 'N/A'}</p>
                 <p><strong>Joined:</strong> {new Date(adminProfile?.created_at || '').toLocaleDateString()}</p>
               </CardContent>
+                <CardFooter className="pt-4">
+                  <a
+                    href="/truck-owners?returnTo=/profiles"
+                    className="w-full"
+                  >
+                    <button className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
+                      Onboard Vehicle Provider
+                    </button>
+                  </a>
+                </CardFooter>
             </Card>
           )}
 
@@ -329,15 +346,18 @@ export default function ProfilesPage() {
                 </div>
 
                 <Card className="bg-white mb-6">
-                  <CardHeader>
+                  {/* <CardHeader>
                     <h3 className="text-lg font-medium">Profile Details</h3>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p><strong>Phone:</strong> {selectedOwner.phone}</p>
-                    <p><strong>ID Type:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners?.aadhaar_or_pan || 'N/A') : 'N/A'}</p>
-                    <p><strong>City:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners?.town_city || 'N/A') : 'N/A'}</p>
-                    <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
+                  </CardHeader> */}
+                  <CardContent className="mt-4 space-y-4">
                     <p><strong>Role:</strong> {selectedOwner.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
+                    <p><strong>Phone:</strong> {selectedOwner.phone}</p>
+                    <p><strong>Aadhar / PAN:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners[0]?.aadhaar_or_pan || 'N/A') : 'N/A'}</p>
+                    <p><strong>City:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner?.truck_owners[0]?.town_city || 'N/A') : 'N/A'}</p>
+                    {selectedOwner?.truck_owners[0]?.bank_account_number && (<p><strong>Account Number:</strong> {selectedOwner?.truck_owners[0]?.bank_account_number}</p>)}
+                    {selectedOwner?.truck_owners[0]?.bank_ifsc_code && (<p><strong>IFSC Number:</strong> {selectedOwner?.truck_owners[0]?.bank_ifsc_code}</p>)}
+                    {selectedOwner?.truck_owners[0]?.upi_id && (<p><strong>UPI ID:</strong> {selectedOwner?.truck_owners[0]?.upi_id}</p>)}
+                    <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
                   </CardContent>
                 </Card>
 

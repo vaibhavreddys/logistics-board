@@ -19,6 +19,23 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Custom function for dd/mm/yyyy HH:mm format
+const formatDateDDMMYYYY = (date: string): string => {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = d.getFullYear();
+    const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const period = d.getHours() >= 12 ? 'PM' : 'AM';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
 export default function TripsPage() {
   const [trips, setTrips] = useState<any[]>([]);
   const [history, setHistory] = useState<Record<string, any[]>>({});
@@ -35,6 +52,8 @@ export default function TripsPage() {
   const [isNewStatusSelected, setIsNewStatusSelected] = useState(false);
   const [tab, setTab] = useState('active');
   const [paymentData, setPaymentData] = useState({
+    client_cost: 0,
+    trip_cost: 0,
     advance_payment: 0,
     final_payment: 0,
     toll_charges: 0,
@@ -45,8 +64,36 @@ export default function TripsPage() {
     platform_fines: 0,
     payment_status: 'Pending',
   });
+
+  const [originalPaymentData, setOriginalPaymentData] = useState(paymentData);
+
   const [showDeductions, setShowDeductions] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (paymentModalOpen) {
+      setOriginalPaymentData(paymentData);
+    }
+  }, [paymentModalOpen]);
+
+  function arePaymentsEqual(a: typeof paymentData, b: typeof paymentData) {
+    return (
+      Number(a.client_cost) === Number(b.client_cost) &&
+      Number(a.trip_cost) === Number(b.trip_cost) &&
+      Number(a.advance_payment) === Number(b.advance_payment) &&
+      Number(a.final_payment) === Number(b.final_payment) &&
+      Number(a.toll_charges) === Number(b.toll_charges) &&
+      Number(a.halting_charges) === Number(b.halting_charges) &&
+      Number(a.traffic_fines) === Number(b.traffic_fines) &&
+      Number(a.handling_charges) === Number(b.handling_charges) &&
+      Number(a.platform_fees) === Number(b.platform_fees) &&
+      Number(a.platform_fines) === Number(b.platform_fines) &&
+      a.payment_status === b.payment_status
+    );
+  }
+
+  // const isModified = JSON.stringify(paymentData) !== JSON.stringify(originalPaymentData);
+  const isModified = !arePaymentsEqual(paymentData, originalPaymentData);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -87,6 +134,7 @@ export default function TripsPage() {
             ),
             trip_payments!trip_payments_trip_id_fkey(
               trip_cost,
+              client_cost,
               advance_payment,
               final_payment,
               toll_charges,
@@ -187,7 +235,17 @@ export default function TripsPage() {
         return;
       }
 
-      const payload = { status: newStatus, updated_at: new Date().toISOString() };
+      trips.find(i => i.id === selectedTripId)?.indents?.client_cost || 0;
+
+      const payload = { 
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+        ...(newStatus === "Started" && {
+          trip_cost: currentTrip.indents?.trip_cost,
+          client_cost: currentTrip.indents?.client_cost,
+        })
+      };
+
       const { error: updateError } = await supabase.from('trips').update(payload).eq('id', selectedTripId);
       if (updateError) {
         setError(`Failed to update trip status: ${updateError.message}`);
@@ -256,17 +314,18 @@ export default function TripsPage() {
 
   const calculateBalance = (trip: any) => {
     const tripCost = trip.indents?.trip_cost || 0;
+     // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
+    const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
     const deductions = [
       trip.trip_payments?.advance_payment || 0,
       trip.trip_payments?.final_payment || 0,
       trip.trip_payments?.toll_charges || 0,
-      trip.trip_payments?.halting_charges || 0,
       trip.trip_payments?.traffic_fines || 0,
       trip.trip_payments?.handling_charges || 0,
       trip.trip_payments?.platform_fees || 0,
       trip.trip_payments?.platform_fines || 0,
     ].reduce((a, b) => a + Number(b), 0);
-    return tripCost - deductions;
+    return tripCost - deductions + vehicle_halting_charges;
   };
 
   const updatePayment = async () => {
@@ -289,7 +348,8 @@ export default function TripsPage() {
         ...paymentData,
         updated_at: new Date().toISOString(),
       };
-
+      console.log("From updatePayment: paymentData=");
+      console.log(paymentData);
       const { error: updateError } = await supabase
         .from('trip_payments')
         .upsert(payload, { onConflict: 'trip_id' });
@@ -318,6 +378,7 @@ export default function TripsPage() {
           ),
           trip_payments!trip_payments_trip_id_fkey(
             trip_cost,
+            client_cost,
             advance_payment,
             final_payment,
             toll_charges,
@@ -339,6 +400,8 @@ export default function TripsPage() {
       setTimeout(() => setSuccess(null), 5000);
       setPaymentModalOpen(false);
       setPaymentData({
+        client_cost: 0,
+        trip_cost: 0,
         advance_payment: 0,
         final_payment: 0,
         toll_charges: 0,
@@ -449,22 +512,18 @@ export default function TripsPage() {
                       <div className="grid grid-cols-3 gap-4 text-center items-center">
                         {/* Left Column */}
                         <div className="space-y-2">
-                          <div>
-                            {/* <p className="text-xs text-gray-500">Client Cost</p>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(i.client_cost)}
-                            </p> */}
-                            <p className="text-xs text-gray-500">Final Amount Paid</p>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(i.trip_payments?.final_payment )}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Trip Cost</p>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(i?.indents?.trip_cost || 0)}
-                            </p>
-                          </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Trip Cost</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(i?.trip_payments?.trip_cost || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Advance Paid</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(i.trip_payments?.advance_payment || 0)}
+                              </p>
+                            </div>
                         </div>
 
                         {/* Center Column */}
@@ -477,28 +536,29 @@ export default function TripsPage() {
 
                         {/* Right Column */}
                         <div className="space-y-2">
-                          <div>
-                            <p className="text-xs text-gray-500">Advance Paid</p>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {formatCurrency(i.trip_payments?.advance_payment || 0)}
-                            </p>
+                            <div>
+                              <p className="text-xs text-gray-500">Platform Fees</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(i.trip_payments?.platform_fees || 0)}
+                              </p>
+                            </div>
                           </div>
+                          {/* <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-gray-500">Charges</p>
+                            <p className="text-xs text-gray-500">Deductions</p>
                             <p className="text-sm font-semibold text-gray-900">
                               {formatCurrency(
                                 [
                                   i.trip_payments?.toll_charges,
-                                  i.trip_payments?.halting_charges,
                                   i.trip_payments?.traffic_fines,
                                   i.trip_payments?.handling_charges,
                                   i.trip_payments?.platform_fees,
                                   i.trip_payments?.platform_fines,
-                                ].filter(Boolean).reduce((a, b) => a + Number(b), 0)
+                                ].filter(Boolean).reduce((a, b) => a + Number(b), 0) - i.trip_payments?.halting_charges
                               )}
                             </p>
                           </div>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
                   </Card>
@@ -520,16 +580,42 @@ export default function TripsPage() {
                     className="w-full border rounded p-2 mt-1"
                     value={newStatus}
                     onChange={(e) => {
-                      setNewStatus(e.target.value);
-                      setIsNewStatusSelected(e.target.value !== (trips.find(i => i.id === selectedTripId)?.status || ''));
+                      const selected = e.target.value;
+                      const currentStatus = trips.find(i => i.id === selectedTripId)?.status || "";
+
+                      setNewStatus(selected);
+                      setIsNewStatusSelected(
+                        selected !== "" && selected !== currentStatus
+                      );
                     }}
                     disabled={loading}
                   >
-                    {['created', 'started', 'paused', 'stopped', 'completed', 'cancelled'].map(status => (
-                      <option key={status} value={status} disabled={trips.find(i => i.id === selectedTripId)?.status === status}>
+                    {/* {['created', 'started', 'paused', 'stopped', 'completed', 'cancelled'].map(status => ( */}
+                    {['created', 'started', 'completed', 'cancelled'].map(status => {
+                    const currentStatus = trips.find(i => i.id === selectedTripId)?.status;
+
+                    const isDisabled = (() => {
+                      if (!currentStatus) return false; // default allow if undefined
+
+                      switch (currentStatus) {
+                        case 'created':
+                          return status === 'created' || status === 'completed'; // only allow started & cancelled
+                        case 'started':
+                          return status === 'created'; // allow completed & cancelled
+                        case 'completed':
+                        case 'cancelled':
+                          return true; // disable all options
+                        default:
+                          return false;
+                      }
+                    })();
+
+                    return (
+                      <option key={status} value={status} disabled={isDisabled}>
                         {status.charAt(0).toUpperCase() + status.slice(1)}
                       </option>
-                    ))}
+                    );
+                  })}
                   </select>
                 </div>
                 {error && <div className="text-red-700 text-sm">{error}</div>}
@@ -577,67 +663,75 @@ export default function TripsPage() {
               <DialogHeader className="p-2">
                 <DialogTitle className="text-lg">Trip Details</DialogTitle>
               </DialogHeader>
-              <div className="p-2 max-h-[70vh] overflow-y-auto">
+              <div className="p-2 max-h-[60vh] overflow-y-auto">
                 {selectedTripId && (
                   <table className="w-full text-sm border-collapse">
                     <tbody>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Trip ID</td>
-                        <td className="py-1">{trips.find(i => i.id === selectedTripId)?.short_id || 'N/A'}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Trip ID</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.short_id || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Origin</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.origin || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Destination</td>
-                        <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.destination || 'N/A'}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Destination</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.destination || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Vehicle Number</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.vehicle_number || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Vehicle Type</td>
-                        <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.vehicle_type || 'N/A'}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Vehicle Type</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.vehicle_type || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Load</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.load_material || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Weight</td>
-                        <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.load_weight_kg || 'N/A'} kg</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Weight</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.load_weight_kg || 'N/A'} kg</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Driver Phone</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.driver_phone || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Contact Phone</td>
-                        <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.contact_phone || 'N/A'}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Contact Phone</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.contact_phone || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Client Name</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.indents?.clients?.name || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Client Cost</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.client_cost || 0}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Client Cost</td>
+                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.indents?.client_cost || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Trip Cost</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.indents?.trip_cost || 0}</td>
+                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.trip_cost || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Advance Amount Paid</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Advance Amount Paid</td>
+                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Final Amount Paid</td>
                         <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.final_payment || 0}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Halting Charges (Refunded)</td>
+                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.halting_charges || 0}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-50">Platform Fees</td>
+                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.platform_fees || 0}</td>
+                      </tr>
+                      {/* <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Other Charges</td>
                         <td className="py-1">₹{
                           [
@@ -649,18 +743,18 @@ export default function TripsPage() {
                             trips.find(i => i.id === selectedTripId)?.trip_payments?.platform_fines,
                           ].filter(Boolean).reduce((a, b) => a + Number(b), 0)
                         }</td>
-                      </tr>
+                      </tr> */}
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Balance Amount</td>
-                        <td className="py-1">₹{calculateBalance(trips.find(i => i.id === selectedTripId) || { indents: {}, trip_payments: {} })}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-300">Balance Amount</td>
+                        <td className="py-1 bg-gray-300 font-semibold">₹{calculateBalance(trips.find(i => i.id === selectedTripId) || { indents: {}, trip_payments: {} })}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Status</td>
                         <td className="py-1">{trips.find(i => i.id === selectedTripId)?.status || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Created At</td>
-                        <td className="py-1">{new Date(trips.find(i => i.id === selectedTripId)?.created_at).toLocaleString() || 'N/A'}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Created At</td>
+                        <td className="py-1 bg-gray-100">{formatDateDDMMYYYY(trips.find(i => i.id === selectedTripId)?.created_at) || 'N/A'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -675,6 +769,8 @@ export default function TripsPage() {
                     const trip = trips.find(i => i.id === selectedTripId);
                     if (trip?.trip_payments) {
                       setPaymentData({
+                        client_cost: trip.trip_payments.client_cost || 0,
+                        trip_cost: trip.trip_payments.trip_cost || 0,
                         advance_payment: trip.trip_payments.advance_payment || 0,
                         final_payment: trip.trip_payments.final_payment || 0,
                         toll_charges: trip.trip_payments.toll_charges || 0,
@@ -705,14 +801,31 @@ export default function TripsPage() {
               </DialogHeader>
               <div className="space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
+                  <label className="text-sm font-medium">Client Cost</label>
+                  <Input
+                    type="number"
+                    value={paymentData.client_cost}
+                    onChange={(e) => setPaymentData({ ...paymentData, client_cost: Number(e.target.value) })}
+                    className="w-full mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Trip Cost</label>
+                  <Input
+                    type="number"
+                    value={paymentData.trip_cost}
+                    onChange={(e) => setPaymentData({ ...paymentData, trip_cost: Number(e.target.value) })}
+                    className="w-full mt-1"
+                  />
+                </div>
+                <div>
                   <label className="text-sm font-medium">Advance Payment</label>
                   <Input
                     type="number"
                     value={paymentData.advance_payment}
                     onChange={(e) => setPaymentData({ ...paymentData, advance_payment: Number(e.target.value) })}
                     className="w-full mt-1"
-                    min="0"
-                    step="0.01"
+                    // min="0"
                   />
                 </div>
                 <div>
@@ -722,8 +835,7 @@ export default function TripsPage() {
                     value={paymentData.final_payment}
                     onChange={(e) => setPaymentData({ ...paymentData, final_payment: Number(e.target.value) })}
                     className="w-full mt-1"
-                    min="0"
-                    step="0.01"
+                    // min="0"
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -738,47 +850,23 @@ export default function TripsPage() {
                 {showDeductions && (
                   <div className="space-y-4 pl-4 border-l-2 border-gray-200">
                     <div>
-                      <label className="text-sm font-medium">Toll Charges</label>
-                      <Input
-                        type="number"
-                        value={paymentData.toll_charges}
-                        onChange={(e) => setPaymentData({ ...paymentData, toll_charges: Number(e.target.value) })}
-                        className="w-full mt-1"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Halting Charges</label>
+                      <label className="text-sm font-medium">Halting Charges (Refunded back to Vehicle Providers)</label>
                       <Input
                         type="number"
                         value={paymentData.halting_charges}
                         onChange={(e) => setPaymentData({ ...paymentData, halting_charges: Number(e.target.value) })}
                         className="w-full mt-1"
                         min="0"
-                        step="0.01"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Traffic Fines</label>
-                      <Input
-                        type="number"
-                        value={paymentData.traffic_fines}
-                        onChange={(e) => setPaymentData({ ...paymentData, traffic_fines: Number(e.target.value) })}
-                        className="w-full mt-1"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Handling Charges</label>
+                      <label className="text-sm font-medium">Load Handling Charges</label>
                       <Input
                         type="number"
                         value={paymentData.handling_charges}
                         onChange={(e) => setPaymentData({ ...paymentData, handling_charges: Number(e.target.value) })}
                         className="w-full mt-1"
                         min="0"
-                        step="0.01"
                       />
                     </div>
                     <div>
@@ -789,18 +877,6 @@ export default function TripsPage() {
                         onChange={(e) => setPaymentData({ ...paymentData, platform_fees: Number(e.target.value) })}
                         className="w-full mt-1"
                         min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Platform Fines</label>
-                      <Input
-                        type="number"
-                        value={paymentData.platform_fines}
-                        onChange={(e) => setPaymentData({ ...paymentData, platform_fines: Number(e.target.value) })}
-                        className="w-full mt-1"
-                        min="0"
-                        step="0.01"
                       />
                     </div>
                   </div>
@@ -825,7 +901,7 @@ export default function TripsPage() {
                 <Button variant="outline" onClick={() => setPaymentModalOpen(false)} disabled={loading}>
                   Cancel
                 </Button>
-                <Button onClick={updatePayment} disabled={loading}>
+                <Button onClick={updatePayment} disabled={loading || !isModified}>
                   {loading ? 'Processing...' : 'Save'}
                 </Button>
               </DialogFooter>
