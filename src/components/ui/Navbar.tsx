@@ -61,15 +61,6 @@ function NavLinks({
             </li>
           ))}
         </ul>
-
-        {isLoggedIn ? (
-          <Button
-            className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
-        ) : isLoadPage ? (
           <a
             href="/"
             className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto flex items-center justify-center"
@@ -77,6 +68,13 @@ function NavLinks({
           >
             Load Board
           </a>
+        {isLoggedIn ? (
+          <Button
+            className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
         ) : (
           <Button
             className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto"
@@ -109,26 +107,25 @@ function NavLinks({
               </li>
             ))}
             <li>
+              <a
+                href="/"
+                className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full md:w-auto flex items-center justify-center"
+                onClick={(e) => onNavigate('/', e)}
+              >
+                Load Board
+              </a>
               {isLoggedIn ? (
                 <Button
                   variant="outline"
-                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full"
+                  className="bg-gradient-to-r mt-2 from-yellow-400 to-yellow-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full"
                   onClick={handleLogout}
                 >
                   Logout
                 </Button>
-              ) : isLoadPage ? (
-                <a
-                  href="/"
-                  className="block bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full text-center"
-                  onClick={(e) => onNavigate('/', e)}
-                >
-                  Load Board
-                </a>
               ) : (
                 <Button
                   variant="outline"
-                  className="bg-gradient-to-r from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full"
+                  className="bg-gradient-to-r mt-2 from-green-400 to-green-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 hover:shadow-lg transition-all w-full"
                   onClick={handleLogin}
                 >
                   Login
