@@ -125,7 +125,7 @@ export default function IndentsPage() {
       setIndents(i || []);
       const { data: t, error: truckError } = await supabase
         .from('trucks')
-        .select('vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(full_name)')
+        .select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)')
         .eq('active', true)
         .order('vehicle_number', { ascending: true });
       console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
@@ -546,8 +546,11 @@ useEffect(() => {
           console.error('Selected truck not found:', vehicleNumber);
           setError('Selected vehicle not found.');
           return;
+        } else {
+          console.log("Selected truck");
+          console.log(selectedTruck)
         }
-        const truckProviderId = isAgentPlaced && selectedAgentId ? selectedAgentId : selectedTruck.owner_id;
+        const truckProviderId = isAgentPlaced && selectedAgentId ? selectedAgentId : selectedTruck.profiles?.id;
         console.log('Assigning truck_provider_id:', truckProviderId, 'Truck ID:', selectedTruck.id); // Debug log
         // Create trip with client_cost and short_id
         const { data: trip, error: tripError } = await supabase
@@ -557,7 +560,8 @@ useEffect(() => {
             client_cost: currentIndent.client_cost,
             short_id: currentIndent.short_id,
             truck_id: selectedTruck.id,
-            truck_provider_id: truckProviderId
+            truck_provider_id: truckProviderId,
+            driver_phone: driverPhone
           })
           .select('id')
           .single();
@@ -565,6 +569,12 @@ useEffect(() => {
           console.error('Error creating trip:', tripError.message);
           setError(`Failed to create trip: ${tripError.message}`);
           return;
+        } else {
+          console.log("Updated trips table with " + {indent_id: selectedIndentId,
+            client_cost: currentIndent.client_cost,
+            short_id: currentIndent.short_id,
+            truck_id: selectedTruck.id,
+            truck_provider_id: truckProviderId})
         }
         payload.trip_id = trip.id;
       }

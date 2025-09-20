@@ -64,7 +64,7 @@ export default function TripsPage() {
     platform_fines: 0,
     payment_status: 'Pending',
   });
-
+  const [initialPaymentData, setInitialPaymentData] = useState(paymentData);
   const [originalPaymentData, setOriginalPaymentData] = useState(paymentData);
 
   const [showDeductions, setShowDeductions] = useState(false);
@@ -91,6 +91,18 @@ export default function TripsPage() {
       a.payment_status === b.payment_status
     );
   }
+
+  // Calculate balance based on paymentData, updates automatically when paymentData changes
+  const getTripBalance = () => {
+    const balance =
+      Number(paymentData.trip_cost || 0) -
+      Number(paymentData.advance_payment || 0) -
+      Number(paymentData.final_payment || 0) +
+      Number(paymentData.halting_charges || 0) -
+      Number(paymentData.handling_charges || 0) -
+      Number(paymentData.platform_fees || 0);
+    return isNaN(balance) ? 0 : balance;
+  };
 
   // const isModified = JSON.stringify(paymentData) !== JSON.stringify(originalPaymentData);
   const isModified = !arePaymentsEqual(paymentData, originalPaymentData);
@@ -307,15 +319,22 @@ export default function TripsPage() {
     }
   };
 
+  const parseCurrencyInput = (value: string): number => {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const num = Number(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
   const formatCurrency = (num: number | null | undefined) => {
     if (!num) return "₹0";
     return "₹" + num.toLocaleString("en-IN");
   };
 
   const calculateBalance = (trip: any) => {
-    const tripCost = trip.indents?.trip_cost || 0;
+    const tripCost = trip.trip_payments?.trip_cost || 0;
      // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
     const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
+    const final_payment = trip.trip_payments?.final_payment || 0;
     const deductions = [
       trip.trip_payments?.advance_payment || 0,
       trip.trip_payments?.final_payment || 0,
@@ -325,6 +344,13 @@ export default function TripsPage() {
       trip.trip_payments?.platform_fees || 0,
       trip.trip_payments?.platform_fines || 0,
     ].reduce((a, b) => a + Number(b), 0);
+    console.log("Payments for trip: " + trip.short_id,
+      {
+      "tripcost" : tripCost,
+      "deductions": deductions,
+      "halting charges": vehicle_halting_charges,
+      "final_payment" : final_payment
+    }, "Formula: Balance = tripCost - final_payment - deduction + halting charges");
     return tripCost - deductions + vehicle_halting_charges;
   };
 
@@ -446,13 +472,40 @@ export default function TripsPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="active" onValueChange={setTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 bg-gray-100 rounded-lg ">
+              <TabsTrigger
+                value="active"
+                className="px-1 py-2 text-lg font-medium rounded-md transition-all duration-200
+                  data-[state=active]:bg-blue-600 data-[state=active]:text-white
+                  hover:bg-blue-50 hover:text-blue-700
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                  text-gray-600"
+              >
+                Active
+              </TabsTrigger>
+              <TabsTrigger
+                value="completed"
+                className="px-4 py-3 text-lg font-medium rounded-md transition-all duration-200
+                  data-[state=active]:bg-blue-600 data-[state=active]:text-white
+                  hover:bg-blue-50 hover:text-blue-700
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                  text-gray-600"
+              >
+                Completed
+              </TabsTrigger>
+              <TabsTrigger
+                value="cancelled"
+                className="px-4 py-3 text-lg font-medium rounded-md transition-all duration-200
+                  data-[state=active]:bg-blue-600 data-[state=active]:text-white
+                  hover:bg-blue-50 hover:text-blue-700
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                  text-gray-600"
+              >
+                Cancelled
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value={tab} className="mt-2">
+            <TabsContent value={tab} className="mt-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {filteredTrips.map(i => (
                   <Card key={i.id} className="w-full bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
@@ -709,27 +762,31 @@ export default function TripsPage() {
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-100">Client Cost</td>
-                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.indents?.client_cost || 0}</td>
+                        <td className="py-1 bg-gray-100">{formatCurrency(trips.find(i => i.id === selectedTripId)?.indents?.client_cost || 0)}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Trip Cost</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.trip_cost || 0}</td>
+                        <td className="py-1">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.trip_cost || 0)}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-100">Advance Amount Paid</td>
-                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0}</td>
+                        <td className="py-1 bg-gray-100">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.advance_payment || 0)}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Final Amount Paid</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.final_payment || 0}</td>
+                        <td className="py-1">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.final_payment || 0)}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-100">Halting Charges (Refunded)</td>
-                        <td className="py-1 bg-gray-100">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.halting_charges || 0}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Load Handling Charges</td>
+                        <td className="py-1 bg-gray-100">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.handling_charges || 0)}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
-                        <td className="font-medium pr-2 py-1 bg-gray-50">Platform Fees</td>
-                        <td className="py-1">₹{trips.find(i => i.id === selectedTripId)?.trip_payments?.platform_fees || 0}</td>
+                        <td className="font-medium pr-2 py-1 bg-gray-50">Halting Charges (Refunded)</td>
+                        <td className="py-1 bg-gray-50">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.halting_charges || 0)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Platform Fees</td>
+                        <td className="py-1 bg-gray-100">{formatCurrency(trips.find(i => i.id === selectedTripId)?.trip_payments?.platform_fees || 0)}</td>
                       </tr>
                       {/* <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Other Charges</td>
@@ -746,7 +803,7 @@ export default function TripsPage() {
                       </tr> */}
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-300">Balance Amount</td>
-                        <td className="py-1 bg-gray-300 font-semibold">₹{calculateBalance(trips.find(i => i.id === selectedTripId) || { indents: {}, trip_payments: {} })}</td>
+                        <td className="py-1 bg-gray-300 font-semibold">₹${calculateBalance(trips.find(i => i.id === selectedTripId))}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Status</td>
@@ -768,19 +825,21 @@ export default function TripsPage() {
                   onClick={() => {
                     const trip = trips.find(i => i.id === selectedTripId);
                     if (trip?.trip_payments) {
-                      setPaymentData({
-                        client_cost: trip.trip_payments.client_cost || 0,
-                        trip_cost: trip.trip_payments.trip_cost || 0,
-                        advance_payment: trip.trip_payments.advance_payment || 0,
-                        final_payment: trip.trip_payments.final_payment || 0,
-                        toll_charges: trip.trip_payments.toll_charges || 0,
-                        halting_charges: trip.trip_payments.halting_charges || 0,
-                        traffic_fines: trip.trip_payments.traffic_fines || 0,
-                        handling_charges: trip.trip_payments.handling_charges || 0,
-                        platform_fees: trip.trip_payments.platform_fees || 0,
-                        platform_fines: trip.trip_payments.platform_fines || 0,
-                        payment_status: trip.trip_payments.payment_status || 'Pending',
-                      });
+                      const newPaymentData = {
+                        client_cost: trip?.trip_payments?.client_cost || 0,
+                        trip_cost: trip?.trip_payments?.trip_cost || 0,
+                        advance_payment: trip?.trip_payments?.advance_payment || 0,
+                        final_payment: trip?.trip_payments?.final_payment || 0,
+                        toll_charges: trip?.trip_payments?.toll_charges || 0,
+                        halting_charges: trip?.trip_payments?.halting_charges || 0,
+                        traffic_fines: trip?.trip_payments?.traffic_fines || 0,
+                        handling_charges: trip?.trip_payments?.handling_charges || 0,
+                        platform_fees: trip?.trip_payments?.platform_fees || 0,
+                        platform_fines: trip?.trip_payments?.platform_fines || 0,
+                        payment_status: trip?.trip_payments?.payment_status || 'Pending',
+                      };
+                      setPaymentData(newPaymentData);
+                      setInitialPaymentData(newPaymentData);
                     }
                     setPaymentModalOpen(true);
                   }}
@@ -803,39 +862,45 @@ export default function TripsPage() {
                 <div>
                   <label className="text-sm font-medium">Client Cost</label>
                   <Input
-                    type="number"
-                    value={paymentData.client_cost}
-                    onChange={(e) => setPaymentData({ ...paymentData, client_cost: Number(e.target.value) })}
+                    type="text"
+                    // Show empty string for 0, otherwise format as currency
+                    value={paymentData.client_cost === 0 ? '' : formatCurrency(paymentData.client_cost)}
+                    // Parse input to number, update paymentData, trigger re-render for balance
+                    onChange={(e) => setPaymentData({ ...paymentData, client_cost: parseCurrencyInput(e.target.value) })}
                     className="w-full mt-1"
+                    placeholder="₹0"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Trip Cost</label>
                   <Input
-                    type="number"
-                    value={paymentData.trip_cost}
-                    onChange={(e) => setPaymentData({ ...paymentData, trip_cost: Number(e.target.value) })}
+                    type="text"
+                    value={paymentData.trip_cost === 0 ? '' : formatCurrency(paymentData.trip_cost)}
+                    // onChange updates paymentData, triggering a re-render and updating balance
+                    onChange={(e) => setPaymentData({ ...paymentData, trip_cost: parseCurrencyInput(e.target.value) })}
                     className="w-full mt-1"
+                    placeholder="₹0"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Advance Payment</label>
                   <Input
-                    type="number"
-                    value={paymentData.advance_payment}
-                    onChange={(e) => setPaymentData({ ...paymentData, advance_payment: Number(e.target.value) })}
+                    type="text"
+                    value={paymentData.advance_payment === 0 ? '' : formatCurrency(paymentData.advance_payment)}
+                    onChange={(e) => setPaymentData({ ...paymentData, advance_payment: parseCurrencyInput(e.target.value) })}
                     className="w-full mt-1"
-                    // min="0"
+                    placeholder="₹0"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Final Payment</label>
                   <Input
-                    type="number"
-                    value={paymentData.final_payment}
-                    onChange={(e) => setPaymentData({ ...paymentData, final_payment: Number(e.target.value) })}
+                    type="text"
+                    value={paymentData.final_payment === 0 ? '' : formatCurrency(paymentData.final_payment)}
+                    // onChange updates paymentData, triggering a re-render and updating balance
+                    onChange={(e) => setPaymentData({ ...paymentData, final_payment: parseCurrencyInput(e.target.value) })}
                     className="w-full mt-1"
-                    // min="0"
+                    placeholder="₹0"
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -852,31 +917,34 @@ export default function TripsPage() {
                     <div>
                       <label className="text-sm font-medium">Halting Charges (Refunded back to Vehicle Providers)</label>
                       <Input
-                        type="number"
-                        value={paymentData.halting_charges}
-                        onChange={(e) => setPaymentData({ ...paymentData, halting_charges: Number(e.target.value) })}
+                        type="text"
+                        value={paymentData.halting_charges === 0 ? '' : formatCurrency(paymentData.halting_charges)}
+                        // onChange updates paymentData, triggering a re-render and updating balance
+                        onChange={(e) => setPaymentData({ ...paymentData, halting_charges: parseCurrencyInput(e.target.value) })}
                         className="w-full mt-1"
-                        min="0"
+                        placeholder="₹0"
                       />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Load Handling Charges</label>
                       <Input
-                        type="number"
-                        value={paymentData.handling_charges}
-                        onChange={(e) => setPaymentData({ ...paymentData, handling_charges: Number(e.target.value) })}
+                        type="text"
+                        value={paymentData.handling_charges === 0 ? '' : formatCurrency(paymentData.handling_charges)}
+                        // onChange updates paymentData, triggering a re-render and updating balance
+                        onChange={(e) => setPaymentData({ ...paymentData, handling_charges: parseCurrencyInput(e.target.value) })}
                         className="w-full mt-1"
-                        min="0"
+                        placeholder="₹0"
                       />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Platform Fees</label>
                       <Input
-                        type="number"
-                        value={paymentData.platform_fees}
-                        onChange={(e) => setPaymentData({ ...paymentData, platform_fees: Number(e.target.value) })}
+                        type="text"
+                        value={paymentData.platform_fees === 0 ? '' : formatCurrency(paymentData.platform_fees)}
+                        // onChange updates paymentData, triggering a re-render and updating balance
+                        onChange={(e) => setPaymentData({ ...paymentData, platform_fees: parseCurrencyInput(e.target.value) })}
                         className="w-full mt-1"
-                        min="0"
+                        placeholder="₹0"
                       />
                     </div>
                   </div>
@@ -894,6 +962,17 @@ export default function TripsPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Balance Amount</label>
+                  <Input
+                    type="text"
+                    // Value updates in real-time based on paymentData changes
+                    value={formatCurrency(getTripBalance())}
+                    className="w-full mt-1 bg-gray-100 cursor-not-allowed"
+                    readOnly
+                    title="Balance updates in real-time as you enter values"
+                  />
                 </div>
                 {error && <div className="text-red-700 text-sm">{error}</div>}
               </div>
