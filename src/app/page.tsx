@@ -13,7 +13,7 @@ import { useDebounce } from 'use-debounce';
 
 interface Indent {
   id: string;
-  client_id: string;
+  // client_id: string;
   origin: string;
   destination: string;
   vehicle_type: string;
@@ -25,7 +25,7 @@ interface Indent {
   contact_phone: string;
   status: string;
   created_at: string;
-  updated_at: string;
+  // updated_at: string;
   short_id: string;
 }
 
@@ -117,7 +117,7 @@ export default function LoadBoard() {
         const { data, error } = await supabase
           .from('indents')
           // .select('*')
-          .select('id, origin, destination, vehicle_type, trip_cost, tat_hours, load_material, load_weight_kg, pickup_at, created_at, contact_phone, short_id')
+          .select('id, origin, destination, vehicle_type, trip_cost, tat_hours, load_material, load_weight_kg, pickup_at, contact_phone, status, created_at, short_id')
           .eq('status', 'open')
           .order('created_at', { ascending: false }); // Sort by created_at descending
         if (error) {
