@@ -70,6 +70,12 @@ export default function IndentsPage() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [message, setMessageUrl] = useState<string | null>(null);
 
+  function log() {
+    const now = new Date();
+    const timestamp = `[${now.toISOString()}]`;
+    console.log(timestamp, ...arguments);
+  }
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -90,49 +96,64 @@ export default function IndentsPage() {
     };
     checkAuth();
 
-    (async () => {
+    const fetchData = async () => {
       try {
-        const { data: c } = await supabase.from('clients').select('id,name');
-        setClients(c || []);
-        const { data: i, error: indentError } = await supabase
+        // Step 1: Fetch "open" indents first
+        log("fetch open indents - start");
+        const { data: openIndents, error: openIndentError } = await supabase
           .from('indents')
           .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
+          .eq('status', 'open')
           .order('created_at', { ascending: false });
-          console.log('Fetched indents:', i?.length || 0); // Debug log
-          const { data: a, error: agentError } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .eq('role', 'truck_agent')
-            .order('full_name', { ascending: true });
-          console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
-          if (agentError) console.error('Error fetching agents:', agentError.message);
-          setAgents(a || []);
-          setFilteredAgents(a || []);
-        if (indentError) {
-          console.error('Error fetching indents:', indentError.message);
-          setError('Failed to load indents.');
+          log("fetch open indents - end");
+        console.log('Fetched open indents:', openIndents?.length || 0); // Debug log
+        if (openIndentError) {
+          console.error('Error fetching open indents:', openIndentError.message);
+          setError('Failed to load open indents.');
           return;
         }
-        setIndents(i || []);
-        const { data: t, error: truckError } = await supabase
-          .from('trucks')
-          .select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)')
-          .eq('active', true)
-          .order('vehicle_number', { ascending: true });
+        setIndents(openIndents || []);
+
+        log("fetch remaining indents - start");
+        // Step 2: Fetch "accepted" and "cancelled" indents afterward
+        const { data: otherIndents, error: otherIndentError } = await supabase
+          .from('indents')
+          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
+          .in('status', ['accepted', 'cancelled'])
+          .order('created_at', { ascending: false });
+        log("fetch remaining indents - end");
+        if (otherIndentError) {
+          console.error('Error fetching other indents:', otherIndentError.message);
+          // Non-critical error, proceed with open indents
+        }
+        // Combine open and other indents, keeping open indents first
+        setIndents((prev) => [...prev, ...(otherIndents || [])]);
+
+        log("fetch other data - start");
+        // Step 3: Fetch other data (clients, agents, trucks) in parallel
+        const [clientsResponse, agentsResponse, trucksResponse] = await Promise.all([
+          supabase.from('clients').select('id,name'),
+          supabase.from('profiles').select('id, full_name').eq('role', 'truck_agent').order('full_name', { ascending: true }),
+          supabase.from('trucks').select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)').eq('active', true).order('vehicle_number', { ascending: true }),
+        ]);
+        log("fetch other data - end");
+        const { data: c } = clientsResponse;
+        setClients(c || []);
+        const { data: a } = agentsResponse;
+        console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
+        setAgents(a || []);
+        setFilteredAgents(a || []);
+        const { data: t } = trucksResponse;
         console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
-        // console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
-        if (truckError) {
-          console.error('Error fetching trucks:', truckError.message);
-          setError('Failed to load trucks.');
-          return;
-        }
         setTrucks(t || []);
         setFilteredTrucks(t || []);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please try again.');
       }
-    })();
+    };
+
+    fetchData();
   }, [router]);
 
   useEffect(() => {
