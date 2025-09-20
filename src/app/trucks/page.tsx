@@ -35,17 +35,8 @@ export default function TrucksPage() {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
           console.log('Auth error or no user:', userError?.message);
-          router.push('/login');
+          router.push("/login?redirect=/trucks");
           return;
-        }
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profileError || profile?.role !== 'admin') {
-          console.error('Profile fetch error or not admin:', profileError?.message);
-          router.push('/');
         }
       } catch (err) {
         console.error('Unexpected error in checkAuth:', err);

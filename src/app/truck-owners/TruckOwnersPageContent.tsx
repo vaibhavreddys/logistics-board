@@ -52,18 +52,8 @@ export default function TruckOwnersPage() {
         console.log('Auth response:', { user, userError }); // Debug log
         if (userError || !user) {
           console.log('Auth error or no user:', userError?.message);
-          router.push('/login');
+          router.push("/login?redirect=/truck-owners");
           return;
-        }
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        console.log('Profile response:', { profile, profileError }); // Debug log
-        if (profileError || profile?.role !== 'admin') {
-          console.error('Profile fetch error:', profileError?.message, 'Role:', profile?.role);
-          router.push('/');
         }
       } catch (err) {
         console.error('Unexpected error in checkAuth:', err);

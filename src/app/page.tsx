@@ -9,6 +9,7 @@ import Navbar from '@/components/ui/Navbar';
 import { Button } from "@/components/ui/button";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
+import { useDebounce } from 'use-debounce';
 
 interface Indent {
   id: string;
@@ -115,7 +116,8 @@ export default function LoadBoard() {
       try {
         const { data, error } = await supabase
           .from('indents')
-          .select('*')
+          // .select('*')
+          .select('id, origin, destination, vehicle_type, trip_cost, tat_hours, load_material, load_weight_kg, pickup_at, created_at, contact_phone, short_id')
           .eq('status', 'open')
           .order('created_at', { ascending: false }); // Sort by created_at descending
         if (error) {
@@ -153,12 +155,13 @@ export default function LoadBoard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const [debouncedQ] = useDebounce(q, 300);
   const filtered = useMemo(() => {
     const s = q.toLowerCase();
     return indents.filter(i =>
       [i.origin, i.destination, i.vehicle_type, i.load_material || ''].some(t => t.toLowerCase().includes(s))
     );
-  }, [q, indents]);
+  }, [debouncedQ, indents]);
 
   // Group indents by section
   const groupedIndents = useMemo(() => {

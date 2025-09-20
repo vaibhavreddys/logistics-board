@@ -113,16 +113,8 @@ export default function TripsPage() {
     const checkAuth = async () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
-        router.push('/login');
+        router.push("/login?redirect=/trips");
         return;
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      if (profile?.role !== 'admin') {
-        router.push('/');
       }
     };
     checkAuth();

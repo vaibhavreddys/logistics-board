@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, Lock, Truck } from 'lucide-react';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
+import { useSearchParams } from 'next/navigation';
 
 interface LoginForm {
   email: string;
@@ -29,6 +30,7 @@ export default function AuthPage() {
 
   const loginForm = useForm<LoginForm>();
   const forgotForm = useForm<ForgotPasswordForm>();
+  const redirectTo = useSearchParams().get('redirect') || '/indents'; // Default to /indents
 
   const handleLogin = async (data: LoginForm) => {
     setLoading(true);
@@ -41,12 +43,7 @@ export default function AuthPage() {
       });
       if (error) throw error;
       if (authData.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-        router.push(profile?.role === 'admin' ? '/indents' : '/');
+        router.push(decodeURIComponent(redirectTo))
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');

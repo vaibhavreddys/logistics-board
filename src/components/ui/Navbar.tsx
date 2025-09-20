@@ -12,7 +12,6 @@ interface NavLink {
 
 function NavLinks({
   isLoggedIn,
-  userRole,
   pathname,
   onNavigate,
   handleLogout,
@@ -20,7 +19,6 @@ function NavLinks({
   isMenuOpen,
 }: {
   isLoggedIn: boolean;
-  userRole: string | null;
   pathname: string;
   onNavigate: (href: string, e?: React.MouseEvent) => void;
   handleLogout: () => Promise<void>;
@@ -32,17 +30,11 @@ function NavLinks({
 
   const navLinks: NavLink[] = isLoggedIn
     ? [
-        ...(userRole === 'admin'
-          ? [
-              { href: '/indents', label: 'Indents' },
-              { href: '/clients', label: 'Clients' },
-              { href: '/trucks', label: 'Trucks' },
-              { href: '/trips', label: 'Trips' },
-              { href: '/profiles', label: 'Profiles' },
-            ]
-          : []),
-        ...(userRole === 'truck_owner' ? [{ href: '/trucks', label: 'Trucks' }] : []),
-        { href: '/', label: 'Load Board' },
+        { href: '/indents', label: 'Indents' },
+        { href: '/clients', label: 'Clients' },
+        { href: '/trucks', label: 'Trucks' },
+        { href: '/trips', label: 'Trips' },
+        { href: '/profiles', label: 'Profiles' },
       ]
     : [];
 
@@ -151,7 +143,6 @@ function NavLinks({
 }
 
 export default function Navbar() {
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
@@ -162,15 +153,9 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setIsLoggedIn(true);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        setUserRole(profile?.role || null);
       } else {
         setIsLoggedIn(false);
-        setUserRole(null);
+        // handleLogin();
       }
     };
     fetchUserData();
@@ -184,7 +169,6 @@ export default function Navbar() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
-    setUserRole(null);
     setIsMenuOpen(false);
     router.push('/');
   };
@@ -217,7 +201,6 @@ export default function Navbar() {
         <Suspense fallback={<div></div>}>
           <NavLinks
             isLoggedIn={isLoggedIn}
-            userRole={userRole}
             pathname={pathname}
             onNavigate={onNavigate}
             handleLogout={handleLogout}
