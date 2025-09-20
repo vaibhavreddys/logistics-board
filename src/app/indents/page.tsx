@@ -75,91 +75,91 @@ export default function IndentsPage() {
   }, []);
 
   useEffect(() => {
-  const checkAuth = async () => {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.log('Auth error or no user:', userError?.message);
-        router.push("/login?redirect=/indents");
-        return;
+    const checkAuth = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.log('Auth error or no user:', userError?.message);
+          router.push("/login?redirect=/indents");
+          return;
+        }
+      } catch (err) {
+        console.error('Unexpected error in checkAuth:', err);
+        setError('An unexpected error occurred. Please try again.');
       }
-    } catch (err) {
-      console.error('Unexpected error in checkAuth:', err);
-      setError('An unexpected error occurred. Please try again.');
+    };
+    checkAuth();
+
+    (async () => {
+      try {
+        const { data: c } = await supabase.from('clients').select('id,name');
+        setClients(c || []);
+        const { data: i, error: indentError } = await supabase
+          .from('indents')
+          .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
+          .order('created_at', { ascending: false });
+          console.log('Fetched indents:', i?.length || 0); // Debug log
+          const { data: a, error: agentError } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('role', 'truck_agent')
+            .order('full_name', { ascending: true });
+          console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
+          if (agentError) console.error('Error fetching agents:', agentError.message);
+          setAgents(a || []);
+          setFilteredAgents(a || []);
+        if (indentError) {
+          console.error('Error fetching indents:', indentError.message);
+          setError('Failed to load indents.');
+          return;
+        }
+        setIndents(i || []);
+        const { data: t, error: truckError } = await supabase
+          .from('trucks')
+          .select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)')
+          .eq('active', true)
+          .order('vehicle_number', { ascending: true });
+        console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
+        // console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
+        if (truckError) {
+          console.error('Error fetching trucks:', truckError.message);
+          setError('Failed to load trucks.');
+          return;
+        }
+        setTrucks(t || []);
+        setFilteredTrucks(t || []);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again.');
+      }
+    })();
+  }, [router]);
+
+  useEffect(() => {
+    console.log('Truck Search term changed:', searchTerm); // Debug log
+    if (searchTerm) {
+      const filtered = trucks.filter(t =>
+        t.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+        console.log('Filtered trucks count:', filtered.length, 'Results:', filtered.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
+      setFilteredTrucks(filtered);
+    } else {
+      setFilteredTrucks(trucks);
     }
-  };
-  checkAuth();
+  }, [searchTerm, trucks]);
 
-  (async () => {
-    try {
-      const { data: c } = await supabase.from('clients').select('id,name');
-      setClients(c || []);
-      const { data: i, error: indentError } = await supabase
-        .from('indents')
-        .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
-        .order('created_at', { ascending: false });
-        console.log('Fetched indents:', i?.length || 0); // Debug log
-        const { data: a, error: agentError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('role', 'truck_agent')
-          .order('full_name', { ascending: true });
-        console.log('Fetched agents:', a, 'Count:', a?.length || 0); // Debug log
-        if (agentError) console.error('Error fetching agents:', agentError.message);
-        setAgents(a || []);
-        setFilteredAgents(a || []);
-      if (indentError) {
-        console.error('Error fetching indents:', indentError.message);
-        setError('Failed to load indents.');
-        return;
-      }
-      setIndents(i || []);
-      const { data: t, error: truckError } = await supabase
-        .from('trucks')
-        .select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)')
-        .eq('active', true)
-        .order('vehicle_number', { ascending: true });
-      console.log('Fetched trucks:', t, 'Count:', t?.length || 0); // Debug log
-      // console.log('Truck profiles:', t?.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
-      if (truckError) {
-        console.error('Error fetching trucks:', truckError.message);
-        setError('Failed to load trucks.');
-        return;
-      }
-      setTrucks(t || []);
-      setFilteredTrucks(t || []);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load data. Please try again.');
+  useEffect(() => {
+    console.log('Agent Search term changed:', agentSearchTerm); // Debug log
+    if (agentSearchTerm) {
+      const filtered = agents.filter(t =>
+        (t?.full_name || '').toLowerCase().includes(agentSearchTerm.toLowerCase()));
+        console.log('Filtered agents count:', filtered.length, 'Results:', filtered.map(t => ({ agent_name: t?.full_name || 'Unknown' }))); // Debug log
+      setFilteredAgents(filtered);
+    } else {
+      setFilteredAgents(agents);
     }
-  })();
-}, [router]);
-
-useEffect(() => {
-  console.log('Truck Search term changed:', searchTerm); // Debug log
-  if (searchTerm) {
-    const filtered = trucks.filter(t =>
-      t.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()));
-      console.log('Filtered trucks count:', filtered.length, 'Results:', filtered.map(t => ({ vehicle_number: t.vehicle_number, owner_name: t.profiles?.full_name || 'Unknown' }))); // Debug log
-    setFilteredTrucks(filtered);
-  } else {
-    setFilteredTrucks(trucks);
-  }
-}, [searchTerm, trucks]);
-
-useEffect(() => {
-  console.log('Agent Search term changed:', agentSearchTerm); // Debug log
-  if (agentSearchTerm) {
-    const filtered = agents.filter(t =>
-      (t?.full_name || '').toLowerCase().includes(agentSearchTerm.toLowerCase()));
-      console.log('Filtered agents count:', filtered.length, 'Results:', filtered.map(t => ({ agent_name: t?.full_name || 'Unknown' }))); // Debug log
-    setFilteredAgents(filtered);
-  } else {
-    setFilteredAgents(agents);
-  }
-}, [agentSearchTerm, agents]);
+  }, [agentSearchTerm, agents]);
 
   interface ImageData {
     caption: string;
