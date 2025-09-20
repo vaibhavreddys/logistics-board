@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Custom function for dd/mm/yyyy HH:mm format
 const formatDateDDMMYYYY = (date: string): string => {
+  console.log("Formatting Date : " + date);
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) return 'Invalid Date';
@@ -94,6 +95,7 @@ export default function TripsPage() {
 
   // Calculate balance based on paymentData, updates automatically when paymentData changes
   const getTripBalance = () => {
+    console.log("Calculating Trip balance from getTripBalance");
     const balance =
       Number(paymentData.trip_cost || 0) -
       Number(paymentData.advance_payment || 0) -
@@ -344,13 +346,14 @@ export default function TripsPage() {
       trip.trip_payments?.platform_fees || 0,
       trip.trip_payments?.platform_fines || 0,
     ].reduce((a, b) => a + Number(b), 0);
-    console.log("Payments for trip: " + trip.short_id,
-      {
-      "tripcost" : tripCost,
-      "deductions": deductions,
-      "halting charges": vehicle_halting_charges,
-      "final_payment" : final_payment
-    }, "Formula: Balance = tripCost - final_payment - deduction + halting charges");
+    // console.log("Payments for trip: " + trip.short_id,
+    //   {
+    //   "tripcost" : tripCost,
+    //   "deductions": deductions,
+    //   "halting charges": vehicle_halting_charges,
+    //   "final_payment" : final_payment
+    // }, "Formula: Balance = tripCost - final_payment - deduction + halting charges");
+    console.log("Balance for " + trip.short_id + " = " + (tripCost - deductions + vehicle_halting_charges));
     return tripCost - deductions + vehicle_halting_charges;
   };
 
@@ -803,7 +806,7 @@ export default function TripsPage() {
                       </tr> */}
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-300">Balance Amount</td>
-                        <td className="py-1 bg-gray-300 font-semibold">₹${calculateBalance(trips.find(i => i.id === selectedTripId))}</td>
+                        <td className="py-1 bg-gray-300 font-semibold">₹{calculateBalance(trips.find(i => i.id === selectedTripId))}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Status</td>

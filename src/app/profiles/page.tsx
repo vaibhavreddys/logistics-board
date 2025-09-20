@@ -314,7 +314,7 @@ export default function ProfilesPage() {
                     className="w-full"
                   >
                     <button className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
-                      Onboard Vehicle Provider
+                      Onboard New Vehicle Provider
                     </button>
                   </a>
                 </CardFooter>

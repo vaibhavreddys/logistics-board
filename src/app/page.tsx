@@ -102,7 +102,7 @@ const getSection = (createdAt: string): string => {
   } else if (indentDate >= startOfWeek) {
     return 'Posted This Week';
   } else {
-    return 'Everything Before That';
+    return 'Posted Before This Week';
   }
 };
 
@@ -165,7 +165,7 @@ export default function LoadBoard() {
     const groups: { [key: string]: Indent[] } = {
       'Posted Today': [],
       'Posted This Week': [],
-      'Everything Before That': [],
+      'Posted Before This Week': [],
     };
 
     filtered.forEach(indent => {
@@ -191,7 +191,7 @@ export default function LoadBoard() {
             />
           </div>
         </div>
-        {['Posted Today', 'Posted This Week', 'Everything Before That'].map(section => (
+        {['Posted Today', 'Posted This Week', 'Posted Before This Week'].map(section => (
           groupedIndents[section].length > 0 && (
             <div key={section} className="space-y-4">
               <div className="flex items-center gap-4">
