@@ -99,13 +99,13 @@ export default function IndentsPage() {
     const fetchData = async () => {
       try {
         // Step 1: Fetch "open" indents first
-        log("fetch open indents - start");
+        // log("fetch open indents - start");
         const { data: openIndents, error: openIndentError } = await supabase
           .from('indents')
           .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
           .eq('status', 'open')
           .order('created_at', { ascending: false });
-          log("fetch open indents - end");
+          // log("fetch open indents - end");
         console.log('Fetched open indents:', openIndents?.length || 0); // Debug log
         if (openIndentError) {
           console.error('Error fetching open indents:', openIndentError.message);
@@ -114,14 +114,14 @@ export default function IndentsPage() {
         }
         setIndents(openIndents || []);
 
-        log("fetch remaining indents - start");
+        // log("fetch remaining indents - start");
         // Step 2: Fetch "accepted" and "cancelled" indents afterward
         const { data: otherIndents, error: otherIndentError } = await supabase
           .from('indents')
           .select('*, profiles!indents_created_by_fkey(full_name), clients!client_id(name), short_id')
           .in('status', ['accepted', 'cancelled'])
           .order('created_at', { ascending: false });
-        log("fetch remaining indents - end");
+        // log("fetch remaining indents - end");
         if (otherIndentError) {
           console.error('Error fetching other indents:', otherIndentError.message);
           // Non-critical error, proceed with open indents
@@ -129,14 +129,14 @@ export default function IndentsPage() {
         // Combine open and other indents, keeping open indents first
         setIndents((prev) => [...prev, ...(otherIndents || [])]);
 
-        log("fetch other data - start");
+        // log("fetch other data - start");
         // Step 3: Fetch other data (clients, agents, trucks) in parallel
         const [clientsResponse, agentsResponse, trucksResponse] = await Promise.all([
           supabase.from('clients').select('id,name'),
           supabase.from('profiles').select('id, full_name').eq('role', 'truck_agent').order('full_name', { ascending: true }),
           supabase.from('trucks').select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)').eq('active', true).order('vehicle_number', { ascending: true }),
         ]);
-        log("fetch other data - end");
+        // log("fetch other data - end");
         const { data: c } = clientsResponse;
         setClients(c || []);
         const { data: a } = agentsResponse;
@@ -1115,7 +1115,7 @@ export default function IndentsPage() {
                           await generateTableImage(loadDetails, setFeedback, setImageSrc);
 
                           const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
-                          const message = encodeURIComponent(`Hello,\nCheckout this load\n\nInterested? Chat here: https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${subMessage}\n\nFind more loads at https://logistics-board.vercel.app/\n\n`);
+                          const message = encodeURIComponent(`Hello,\nCheckout this load\n\nInterested? Chat here: https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${subMessage}\n\nFind more loads at https://freight24.in/\n\n`);
                           setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
                         }}
                       >
@@ -1128,7 +1128,7 @@ export default function IndentsPage() {
                   {imageSrc && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                       <div className="bg-white p-4 rounded-lg">
-                        <img src={imageSrc} alt="Load Details" style={{ maxWidth: '100%', maxHeight: '90vh' }} />
+                        <img src={imageSrc} alt="Load Details" style={{ maxWidth: '100%', maxHeight: '70vh' }} />
                         <span>Copy the image first and then click on "WhatsApp" button, paste the image before sending the message on WhatsApp.</span><br></br>
                         <span>The message will be sent to the person who created the indent, you can forward it to the vehicle provider's groups.</span><br></br>
                         <div className="mt-4 flex justify-between items-center">

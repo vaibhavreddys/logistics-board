@@ -108,6 +108,11 @@ export default function TripsPage() {
 
   // const isModified = JSON.stringify(paymentData) !== JSON.stringify(originalPaymentData);
   const isModified = !arePaymentsEqual(paymentData, originalPaymentData);
+  const isTripPaymentModDisabled = () => {
+    const currentStatus = trips.find(i => i.id === selectedTripId)?.status || "";
+    console.log("Trip status is " + currentStatus + " - modifiable = " + (currentStatus === "started" || currentStatus === "completed"));
+    return (currentStatus === "created" || currentStatus === "cancelled")
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -324,11 +329,15 @@ export default function TripsPage() {
     return "₹" + num.toLocaleString("en-IN");
   };
 
+  const calculatePaymentCleared = (trip: any) => {
+    const advance_payment = trip.trip_payments?.advance_payment || 0;
+    const final_payment = trip.trip_payments?.final_payment || 0;
+    return advance_payment + final_payment;
+  }
   const calculateBalance = (trip: any) => {
     const tripCost = trip.trip_payments?.trip_cost || 0;
      // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
     const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
-    const final_payment = trip.trip_payments?.final_payment || 0;
     const deductions = [
       trip.trip_payments?.advance_payment || 0,
       trip.trip_payments?.final_payment || 0,
@@ -563,13 +572,13 @@ export default function TripsPage() {
                             <div>
                               <p className="text-xs text-gray-500">Trip Cost</p>
                               <p className="text-sm font-semibold text-gray-900">
-                                {formatCurrency(i?.trip_payments?.trip_cost || 0)}
+                                {formatCurrency(i?.trip_payments?.trip_cost || i?.indents?.trip_cost || 0)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Advance Paid</p>
+                              <p className="text-xs text-gray-500">Payment Cleared</p>
                               <p className="text-sm font-semibold text-gray-900">
-                                {formatCurrency(i.trip_payments?.advance_payment || 0)}
+                                {formatCurrency(calculatePaymentCleared(i))}
                               </p>
                             </div>
                         </div>
@@ -584,6 +593,12 @@ export default function TripsPage() {
 
                         {/* Right Column */}
                         <div className="space-y-2">
+                            <div>
+                              <p className="text-xs text-gray-500">Client Cost</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(i?.trip_payments?.client_cost || i?.indents?.client_cost || 0)}
+                              </p>
+                            </div>
                             <div>
                               <p className="text-xs text-gray-500">Platform Fees</p>
                               <p className="text-sm font-semibold text-gray-900">
@@ -811,6 +826,9 @@ export default function TripsPage() {
                     </tbody>
                   </table>
                 )}
+                {isTripPaymentModDisabled() && (
+                  <p className="text-red-700 text-sm">Trip should be Started or Completed to modify payments</p>
+                )}
               </div>
               <DialogFooter className="p-2 flex justify-between">
                 <Button variant="outline" onClick={() => setInfoModalOpen(false)} disabled={loading} className="text-sm px-3 py-1">
@@ -838,7 +856,7 @@ export default function TripsPage() {
                     }
                     setPaymentModalOpen(true);
                   }}
-                  disabled={loading}
+                  disabled={isTripPaymentModDisabled()}
                   className="text-sm px-3 py-1"
                 >
                   Manage Payments
@@ -851,7 +869,7 @@ export default function TripsPage() {
           <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Update Payment Details</DialogTitle>
+                <DialogTitle>Update Payment Details ({trips.find(i => i.id === selectedTripId)?.short_id || 'N/A'})</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>

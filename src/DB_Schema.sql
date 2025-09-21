@@ -45,15 +45,15 @@ CREATE TABLE public.indents (
   client_cost numeric DEFAULT 0,
   short_id character varying,
   CONSTRAINT indents_pkey PRIMARY KEY (id),
+  CONSTRAINT indents_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
   CONSTRAINT indents_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id),
-  CONSTRAINT indents_selected_truck_id_fkey FOREIGN KEY (selected_truck_id) REFERENCES public.trucks(id),
-  CONSTRAINT indents_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id)
+  CONSTRAINT indents_selected_truck_id_fkey FOREIGN KEY (selected_truck_id) REFERENCES public.trucks(id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
   full_name text,
   phone text,
-  role text NOT NULL DEFAULT 'truck_owner'::text CHECK (role = ANY (ARRAY['admin'::text, 'dispatcher'::text, 'truck_owner'::text])),
+  role text NOT NULL DEFAULT ''::text,
   created_at timestamp with time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
@@ -74,6 +74,8 @@ CREATE TABLE public.trip_payments (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   final_payment numeric DEFAULT 0.00 CHECK (final_payment >= 0::numeric),
+  client_cost numeric,
+  trip_profit numeric,
   CONSTRAINT trip_payments_pkey PRIMARY KEY (id),
   CONSTRAINT trip_payments_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.trips(id)
 );
@@ -100,13 +102,16 @@ CREATE TABLE public.trips (
   remarks text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  short_id text DEFAULT lpad((nextval('trips_short_id_seq'::regclass))::text, 5, '0'::text),
-  owner_cost numeric DEFAULT 0,
+  short_id text DEFAULT lpad((nextval('trips_short_id_seq'::regclass))::text, 5, '0'::text) UNIQUE,
+  trip_cost numeric DEFAULT 0,
   client_cost numeric DEFAULT 0,
+  truck_provider_id uuid,
+  driver_phone numeric,
   CONSTRAINT trips_pkey PRIMARY KEY (id),
-  CONSTRAINT trips_truck_id_fkey FOREIGN KEY (truck_id) REFERENCES public.trucks(id),
+  CONSTRAINT trips_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.profiles(id),
   CONSTRAINT trips_indent_id_fkey FOREIGN KEY (indent_id) REFERENCES public.indents(id),
-  CONSTRAINT trips_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.profiles(id)
+  CONSTRAINT trips_truck_id_fkey FOREIGN KEY (truck_id) REFERENCES public.trucks(id),
+  CONSTRAINT trips_truck_provider_id_fkey FOREIGN KEY (truck_provider_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.truck_owners (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

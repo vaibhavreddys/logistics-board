@@ -181,7 +181,12 @@ export default function Navbar() {
   return (
     <nav className="bg-gradient-to-r from-blue-600 to-purple-700 text-white shadow-lg p-4">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
-        <div className="text-2xl font-bold tracking-wide">Freight 24</div>
+        <div className="text-2xl font-bold tracking-wide clickable-div hover:scale-105 hover:shadow-lg"
+              role="button"
+              aria-label="Go to Load Board Page"
+              onClick={(e) => onNavigate('/', e)}
+        >
+          Freight 24</div>
 
         {/* Hamburger for mobile */}
         <div className="md:hidden">

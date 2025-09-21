@@ -35,7 +35,7 @@ export default function DynamicTitle() {
         break;
       // Add more routes as needed
       default:
-        title = 'Freight 24 | Load Board'; // Fallback title
+        title = 'Freight 24 - Digital Freight Aggregator Platform | Truck Booking'; // Fallback title
     }
     document.title = title;
   }, [pathname]);

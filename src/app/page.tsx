@@ -204,9 +204,19 @@ export default function LoadBoard() {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {groupedIndents[section].map(i => (
                   <Card key={i.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-xl">
-                    <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex justify-between">
-                      <h2 className="text-lg font-semibold self-start">{i.origin} → {i.destination}</h2>
-                      <span className="text-xl font-bold self-start">{`₹${Number(i.trip_cost).toLocaleString()}`}</span>
+                    <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex flex-col gap-1">
+                      <h2 className="text-lg font-semibold">{i.origin} → {i.destination}</h2>
+                      <div className="flex justify-between items-center">
+                        {i.trip_cost > 0 && (
+                          <span className="text-md font-bold">
+                            ₹{Number(i.trip_cost).toLocaleString()}
+                          </span>
+                        )}
+                        <span className="text-sm font-bold"
+                              title={`Posted at ${new Date(i.created_at).toLocaleString()}`}
+                        >
+                        ⏱ {formatAge(i.created_at)}</span>
+                      </div>
                     </CardHeader>
                     <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
                       <div className="space-y-3 text-sm text-gray-700">
@@ -226,11 +236,6 @@ export default function LoadBoard() {
                           <span className="text-gray-500 w-6 flex-shrink-0">📅</span>
                           <span className="w-20 font-medium flex-shrink-0">Entry At:</span>
                           <span>{formatDateDDMMYYYY(i.pickup_at)}</span>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-gray-500 w-6 flex-shrink-0">⏳</span>
-                          <span className="w-20 font-medium flex-shrink-0">Posted:</span>
-                          <span>{formatAge(i.created_at)}</span>
                         </div>
                         <div className="flex items-baseline gap-2">
                           <span className="text-gray-500 w-6 flex-shrink-0">⏱</span>
