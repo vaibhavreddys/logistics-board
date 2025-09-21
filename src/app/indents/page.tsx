@@ -270,6 +270,8 @@ export default function IndentsPage() {
       canvas.width = width * 2;
       canvas.height = dynamicHeight * 2;
       ctx.scale(2, 2);
+      ctx.fillStyle = "#ffffff";   
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // === Helper for rounded rect ===
       function roundRect(

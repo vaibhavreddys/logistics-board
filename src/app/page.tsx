@@ -179,6 +179,11 @@ export default function LoadBoard() {
     return groups;
   }, [filtered]);
 
+  // Track page view explicitly (optional, since <Analytics /> already tracks page views)
+  useEffect(() => {
+    window.analytics?.track('loadboard_page_view');
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
       <Navbar />
@@ -189,7 +194,12 @@ export default function LoadBoard() {
             <Input
               placeholder="Search by city, vehicle, or material"
               value={q}
-              onChange={e => setQ(e.target.value)}
+              onChange={(e) => {
+                setQ(e.target.value);
+                if (e.target.value) {
+                  window.analytics?.track('search_query', { query: e.target.value });
+                }
+              }}
               className="w-full sm:w-64 p-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
@@ -254,7 +264,16 @@ export default function LoadBoard() {
                         <Button
                           variant="default"
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-                          onClick={() => window.location.href = `tel:${i.contact_phone}`}
+                          onClick={() => {
+                            window.analytics?.track('load_contact_click', {
+                              load_id: i.short_id,
+                              origin: i.origin,
+                              destination: i.destination,
+                              vehicle_type: i.vehicle_type,
+                              timestamp: new Date().toISOString(),
+                            });
+                            window.location.href = `tel:${i.contact_phone}`;
+                          }}
                         >
                           <Phone size={18} /> Contact
                         </Button>
@@ -262,6 +281,13 @@ export default function LoadBoard() {
                           variant="outline"
                           className="flex-1 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"
                           onClick={() => {
+                            window.analytics?.track('load_whatsapp_click', {
+                              load_id: i.short_id,
+                              origin: i.origin,
+                              destination: i.destination,
+                              vehicle_type: i.vehicle_type,
+                              timestamp: new Date().toISOString(),
+                            });
                             const loadDetails = [
                               `Load ID: *${i.short_id}*`,
                               `Route: ${i.origin} → ${i.destination}`,
@@ -287,6 +313,8 @@ export default function LoadBoard() {
           )
         ))}
       </main>
+      <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
