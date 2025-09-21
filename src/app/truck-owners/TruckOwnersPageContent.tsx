@@ -63,6 +63,11 @@ export default function TruckOwnersPage() {
     checkAuth();
   }, [router]);
 
+  const handleIfscChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const upperCaseValue = e.target.value.toUpperCase();
+    setValue('bank_ifsc_code', upperCaseValue, { shouldValidate: true });
+  };
+
   const handleAddTruckOwner = async (data: TruckOwnerForm) => {
     setLoading(true);
     setError(null);
@@ -138,7 +143,7 @@ export default function TruckOwnersPage() {
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <Input
                       id="full_name"
-                      placeholder="Vaibhav S"
+                      placeholder="Enter Your Name"
                       className="pl-10"
                       {...register('full_name', { required: 'Name is required' })}
                     />
@@ -243,6 +248,7 @@ export default function TruckOwnersPage() {
                           message: 'Enter a valid IFSC code (e.g., SBIN0001234)',
                         },
                       })}
+                      onChange={(e) => handleIfscChange(e)}
                     />
                     {errors.bank_ifsc_code && <p className="text-red-500 text-sm">{errors.bank_ifsc_code.message}</p>}
                   </div>
@@ -253,7 +259,7 @@ export default function TruckOwnersPage() {
                     <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <Input
                       id="upi_id"
-                      placeholder="vaibhav@upi"
+                      placeholder="name-bank@upi"
                       className="pl-10"
                       {...register('upi_id')}
                     />

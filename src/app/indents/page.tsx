@@ -79,6 +79,22 @@ export default function IndentsPage() {
     console.log(timestamp, ...arguments);
   }
 
+  const formatDateDDMMYYYY = (date: string): string => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return 'Invalid Date';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+      const year = d.getFullYear();
+      const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const period = d.getHours() >= 12 ? 'PM' : 'AM';
+      return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -230,89 +246,147 @@ export default function IndentsPage() {
     }>;
   }
 
-  const generateTableImage = async (data: ImageData, setFeedback: (msg: string | null) => void, setImageSrc: (url: string | null) => void) => {
+  const generateTableImage = async (
+    data: ImageData,
+    setFeedback: (msg: string | null) => void,
+    setImageSrc: (url: string | null) => void
+  ) => {
     try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context not available');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context not available");
 
-      const width = 450; // Increased width for better layout
-      const height = 350; // Adjusted height for more rows and padding
-      canvas.width = width * 2; // High DPI
-      canvas.height = height * 2;
+      const width = 500;
+
+      // Filter valid rows (skip Route/NA)
+      const validRows = data.rows.filter(
+        (r) => r.label !== "Route" && r.value && r.value !== "NA"
+      );
+
+      // Each row ~45px tall + header (100px start offset) + bottom padding
+      const rowHeight = 45;
+      const dynamicHeight = 100 + validRows.length * rowHeight + 40;
+
+      canvas.width = width * 2;
+      canvas.height = dynamicHeight * 2;
       ctx.scale(2, 2);
 
-      // Modern Background and Border
-      ctx.fillStyle = '#f9fafb'; // Light gray background
-      ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = '#141617ff'; // Subtle gray border
-      ctx.lineWidth = 2;
-      ctx.strokeRect(10, 10, width - 20, height - 20);
-
-      // Table Header Styling
-      ctx.fillStyle = '#6051abff'; // Blue header background
-      ctx.fillRect(20, 30, width - 40, 30);
-      ctx.fillStyle = '#ffffff'; // White text for header
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(data.rows[1].value, 30, 50);
-
-      // Table Rows with Dynamic Styling
-      const rowHeight = 30;
-      const startY = 100;
-      let itemCount = 0;
-      data.rows.forEach((row, index) => {
-        console.log(row.label);
-        console.log(row.value);
-        if (row.label === "Route") return;
-        if (row.value === "NA") return;
-        const y = startY + (itemCount++ * rowHeight);
-        const fontSize = row.fontSize || 12;
-        const isBold = itemCount == 0;
-        const color = '#071625ff';
-
-        // Label
-        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSize}px Arial`;
-        ctx.fillStyle = '#0b0b0cff'; // Gray for labels
-        ctx.fillText(row.label, 30, y);
-
-        // Value
-        ctx.font = `${isBold ? 'bold' : 'normal'} ${fontSize}px Arial`;
-        ctx.fillStyle = color; // Dynamic color for values
-        ctx.fillText(row.value || '—', 200, y); // Adjusted x for better alignment
-      });
-
-      // Convert to blob and handle display
-      const blob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/png');
-      });
-
-      if (!blob) throw new Error('Failed to create image blob');
-
-      // This is for laptops
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
-        setFeedback(`Image copied to clipboard! (Indent: ${data.rows[0].value})`);
-        setTimeout(() => setFeedback(null), 3000);
-      // } else {
+      // === Helper for rounded rect ===
+      function roundRect(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        r: number
+      ) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
       }
-        // This if mobile phones
-        const url = URL.createObjectURL(blob);
-        console.log(url);
-        setImageSrc(url);
-        if (!(navigator.clipboard && window.isSecureContext)) {
-          setFeedback('Image generated! Long-press to copy.');
-          setTimeout(() => setFeedback(null), 3000);
-        }
-      // }
 
+      // === Outer card background ===
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.25)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, 20, 20, width - 40, dynamicHeight - 40, 20);
+      ctx.fill();
+      ctx.restore();
+
+      // === Gradient header with shadow ===
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.25)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 2;
+
+      const headerHeight = 50;
+      const grad = ctx.createLinearGradient(20, 20, width - 20, 20);
+      grad.addColorStop(0, "#4f46e5");
+      grad.addColorStop(1, "#9333ea");
+      ctx.fillStyle = grad;
+
+      // Only top corners rounded
+      ctx.beginPath();
+      ctx.moveTo(20 + 20, 20);
+      ctx.arcTo(width - 20, 20, width - 20, 20 + 20, 20);
+      ctx.lineTo(width - 20, 20 + headerHeight);
+      ctx.lineTo(20, 20 + headerHeight);
+      ctx.lineTo(20, 20 + 20);
+      ctx.arcTo(20, 20, 20 + 20, 20, 20);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+
+      // === Header Text ===
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 18px Arial";
+      const headerText =
+        data.rows.find((r) => r.label === "Route")?.value || "Route";
+      ctx.fillText(headerText, 40, 50);
+
+      // === Rows (dynamically with row backgrounds + stripes) ===
+      let y = 100;
+      validRows.forEach((row, idx) => {
+        // Alternating striped background
+        const bgColor = idx % 2 === 0 ? "#f3f4f6" : "#e5e7eb";
+
+        // Row background with rounded corners + shadow
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.25)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        ctx.fillStyle = bgColor;
+        roundRect(ctx, 40, y - 20, width - 80, 35, 8);
+        ctx.fill();
+        ctx.restore();
+
+        // Label with icons
+        ctx.font = "14px Arial";
+        ctx.fillStyle = "#374151";
+        let labelText = row.label;
+        if (row.label === "Vehicle") labelText = `🚚 ${row.label}`;
+        else if (row.label === "Load ID") labelText = `🆔 ${row.label}`;
+        else if (row.label === "Placement At") labelText = `📅 Placement`;
+        else if (row.label === "TAT") labelText = `⏱ ${row.label}`;
+        else if (row.label === "Load" || row.label === "Material")
+          labelText = `📦 ${row.label}`;
+        else if (row.label === "Client") labelText = `🏤 ${row.label}`;
+        else if (row.label === "Trip Cost") labelText = `💰 ${row.label}`;
+
+        ctx.fillText(`${labelText}:`, 60, y);
+        ctx.font = row.label === "Vehicle" ? "bold 14px Arial" : "14px Arial";
+        ctx.fillStyle = "#111827";
+        ctx.fillText(row.value, 180, y);
+
+        y += rowHeight;
+      });
+
+      // === Export ===
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), "image/png");
+      });
+      if (!blob) throw new Error("Failed to create image blob");
+
+      const url = URL.createObjectURL(blob);
+      setImageSrc(url);
+      setFeedback("Image generated!");
+      setTimeout(() => setFeedback(null), 3000);
     } catch (error) {
-      console.error('Error generating table image:', error);
-      setFeedback('Failed to generate image. Please try again.');
+      console.error("Error generating table image:", error);
+      setFeedback("Failed to generate image. Please try again.");
       setTimeout(() => setFeedback(null), 3000);
     }
   };
+
+
+
 
   const validateForm = () => {
     if (!form.client_id) return 'Please select a client.';
@@ -1150,21 +1224,21 @@ export default function IndentsPage() {
                           const loadDetails = {
                             caption: `Checkout this load ${i.short_id}`,
                             rows: [
-                              { label: 'Load ID', value: i.short_id },
                               { label: 'Route', value: `${i.origin} ⮕ ${i.destination}`, isBold: true, fontSize: 14 },
                               { label: 'Vehicle', value: i.vehicle_type || 'NA' },
                               { label: 'Load', value: i.load_weight_kg ? `${i.load_weight_kg} MT` : 'NA'},
                               { label: 'Material', value: `${i.load_material || ''}`.trim() || 'NA' },
-                              { label: 'Placement At', value: i.pickup_at ? new Date(i.pickup_at).toLocaleString() : 'NA' },
+                              { label: 'Placement At', value: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA' },
                               { label: 'Client', value: i.clients?.name || 'NA' },
                               { label: 'Trip Cost', value: i.trip_cost ? `₹${i.trip_cost}` : 'NA' },
+                              { label: 'Load ID', value: i.short_id },
                             ],
                           };
                           console.log(loadDetails);
                           await generateTableImage(loadDetails, setFeedback, setImageSrc);
 
-                          const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
-                          const message = encodeURIComponent(`Hello,\nCheckout this load\n\nInterested? Chat here: https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${subMessage}\n\nFind more loads at https://freight24.in/\n\n`);
+                          // const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
+                          const message = encodeURIComponent(`Hello, checkout this load\n\nFind more loads at https://freight24.in/\n\n`);
                           setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
                         }}
                       >

@@ -92,7 +92,11 @@ function LoadPageContent() {
         <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow border border-gray-200 rounded-xl">
           <CardHeader className="!p-4 bg-gradient-to-r from-blue-600 to-purple-700 text-white flex justify-between">
             <h2 className="text-lg font-semibold self-start">{indent.origin} → {indent.destination}</h2>
-            <span className="text-xl font-bold self-start">{`₹${Number(indent.trip_cost).toLocaleString()}`}</span>
+            {indent.trip_cost > 0 && (
+              <span className="text-md font-bold">
+                ₹{Number(indent.trip_cost).toLocaleString()}
+              </span>
+            )}
           </CardHeader>
           <CardContent className="!p-4 space-y-3 text-sm text-gray-700">
             <div className="space-y-3 text-sm text-gray-700">
