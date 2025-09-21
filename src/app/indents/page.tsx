@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Navbar from '@/components/ui/Navbar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 
@@ -69,6 +70,8 @@ export default function IndentsPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [message, setMessageUrl] = useState<string | null>(null);
+  const [useMyPhone, setUseMyPhone] = useState(false);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
 
   function log() {
     const now = new Date();
@@ -154,7 +157,41 @@ export default function IndentsPage() {
     };
 
     fetchData();
+
+    const fetchUserPhone = async () => {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setUserPhone(data?.phone || null);
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch phone number');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserPhone();
   }, [router]);
+  
+  // Handle checkbox toggle
+  const handleCheckboxChange = (checked: boolean) => {
+    setUseMyPhone(checked);
+    if (checked && userPhone) {
+      setForm({ ...form, contact_phone: userPhone });
+    } else {
+      setForm({ ...form, contact_phone: '' }); // Clear input when unchecked
+      setError(null);
+    }
+  };
 
   useEffect(() => {
     console.log('Truck Search term changed:', searchTerm); // Debug log
@@ -879,9 +916,21 @@ export default function IndentsPage() {
               <Input
                 type="text"
                 value={form.contact_phone}
+                disabled={useMyPhone}
                 onChange={e => setForm({ ...form, contact_phone: e.target.value })}
               />
             </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="use_my_phone"
+                checked={useMyPhone}
+                onCheckedChange={handleCheckboxChange}
+                disabled={loading || !userPhone}
+              />
+              <Label htmlFor="use_my_phone" className="text-gray-700">
+                Use My Phone Number {userPhone ? `(${userPhone})` : '(Loading...)'}
+              </Label>
+          </div>
           </div>
           <div className="flex gap-2">
             <Button onClick={editingIndentId ? updateIndent : createIndent} disabled={loading}>
