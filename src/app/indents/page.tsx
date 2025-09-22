@@ -153,7 +153,7 @@ export default function IndentsPage() {
         const [clientsResponse, agentsResponse, trucksResponse] = await Promise.all([
           supabase.from('clients').select('id,name'),
           supabase.from('profiles').select('id, full_name').eq('role', 'truck_agent').order('full_name', { ascending: true }),
-          supabase.from('trucks').select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id)').eq('active', true).order('vehicle_number', { ascending: true }),
+          supabase.from('trucks').select('id, vehicle_number, vehicle_type, profiles!trucks_owner_id_fkey(id, full_name)').eq('active', true).order('vehicle_number', { ascending: true }),
         ]);
         // log("fetch other data - end");
         const { data: c } = clientsResponse;
