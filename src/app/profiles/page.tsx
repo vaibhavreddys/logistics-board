@@ -46,6 +46,26 @@ interface Truck {
   created_at: string;
 }
 
+interface Payment {
+  id: string;
+  trip_id: string;
+  trip_cost: number;
+  advance_payment: number;
+  toll_charges: number;
+  halting_charges: number;
+  traffic_fines: number;
+  handling_charges: number;
+  platform_fees: number;
+  platform_fines: number;
+  payment_status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  final_payment: number;
+  client_cost: number | null;
+  // trip_profit: number | null;
+}
+
 interface Trip {
   id: string;
   indent_id: string;
@@ -58,7 +78,26 @@ interface Trip {
   short_id: string;
   origin: string;
   destination: string;
+  payments?: Payment;
 }
+
+// Custom function for dd/mm/yyyy HH:mm format
+const formatDateDDMMYYYY = (date: string): string => {
+  console.log("Formatting Date : " + date);
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = d.getFullYear();
+    const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const period = d.getHours() >= 12 ? 'PM' : 'AM';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
 
 export default function ProfilesPage() {
   const [adminProfile, setAdminProfile] = useState<Profile | null>(null);
@@ -143,13 +182,20 @@ export default function ProfilesPage() {
           indents!trips_indent_id_fkey (
             origin,
             destination
-          )
+          ),
+          trip_payments!trip_payments_trip_id_fkey (*)
         `)
         .in('truck_id', truckIds)
         .order('created_at', { ascending: false });
       console.log('Fetched tripsData:', tripsData); // Debug log for trips data
       if (tripsError) console.error('Error fetching trips:', tripsError);
-      setTrips(tripsData || []);
+      const formattedTrips = tripsData?.map(trip => ({
+        ...trip,
+        origin: trip.indents?.origin || 'N/A',
+        destination: trip.indents?.destination || 'N/A',
+        payments: trip.trip_payments,
+      })) || [];
+      setTrips(formattedTrips);
 
       setLoading(false);
     };
@@ -179,8 +225,24 @@ export default function ProfilesPage() {
 
   const getOwnerTrucks = (ownerId: string) => trucks.filter(t => t.owner_id === ownerId);
   const getTruckTrips = (truckId: string) => trips.filter(t => t.truck_id === truckId);
+  const getOwnerTrips = (ownerId: string) => {
+    const ownerTruckIds = getOwnerTrucks(ownerId).map(t => t.id);
+    return trips.filter(t => t.truck_id && ownerTruckIds.includes(t.truck_id));
+  };
   const getTripTruck = (trip: Trip) => trucks.find(t => t.id === trip.truck_id);
   const getTripOwner = (trip: Trip) => truckOwners.find(o => getOwnerTrucks(o.id).some(t => t.id === trip.truck_id));
+  
+  const getTripGrossProfit = (payment: Payment) => {
+    return (payment.client_cost? payment.client_cost : 0) - (payment.trip_cost);
+  };
+
+  const getTripEarnings = (payment: Payment) => {
+    const client_cost = payment.client_cost? payment.client_cost : 0;
+    if (client_cost === 0) return 0;
+    if (payment.advance_payment === 0 || payment.final_payment === 0) return 0;
+    const amount_paid_to_vehicle_provider = payment.advance_payment + payment.final_payment + payment.halting_charges;
+    return client_cost - amount_paid_to_vehicle_provider;
+  }
 
   if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
@@ -403,15 +465,15 @@ export default function ProfilesPage() {
                     <CardHeader>
                       <h3 className="text-lg font-medium flex items-center">
                         <Route size={20} className="mr-2" />
-                        Trips ({getTruckTrips(getOwnerTrucks(selectedOwner.id).map(t => t.id).join(',')).length})
+                        Trips ({getOwnerTrips(selectedOwner.id).length})
                       </h3>
                     </CardHeader>
                     <CardContent>
-                      {getTruckTrips(getOwnerTrucks(selectedOwner.id).map(t => t.id).join(',')).length === 0 ? (
+                      {getOwnerTrips(selectedOwner.id).length === 0 ? (
                         <p className="text-gray-500">No trips serviced.</p>
                       ) : (
                         <ul className="space-y-2">
-                          {getTruckTrips(getOwnerTrucks(selectedOwner.id).map(t => t.id).join(',')).map(trip => (
+                          {getOwnerTrips(selectedOwner.id).map(trip => (
                             <li
                               key={trip.id}
                               className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -474,7 +536,7 @@ export default function ProfilesPage() {
                     <li
                       key={trip.id}
                       className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
-                      onClick={() => setSelectedTrip(trip)}
+                      onClick={() => {console.log(trip); setSelectedTrip(trip);}}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -515,7 +577,34 @@ export default function ProfilesPage() {
                   <p><strong>Status:</strong> {selectedTrip.status}</p>
                   <p><strong>Start Time:</strong> {selectedTrip.start_time ? new Date(selectedTrip.start_time).toLocaleString() : 'N/A'}</p>
                   <p><strong>End Time:</strong> {selectedTrip.end_time ? new Date(selectedTrip.end_time).toLocaleString() : 'N/A'}</p>
-                  <p><strong>Created:</strong> {new Date(selectedTrip.created_at).toLocaleDateString()}</p>
+                  <p><strong>Created:</strong> {formatDateDDMMYYYY(selectedTrip.created_at)}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-white mb-6">
+                <CardHeader>
+                  <h3 className="text-lg font-semibold">Payment Information</h3>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedTrip.payments ? (
+                    <>
+                      <p><strong>Trip Cost:</strong> ₹{selectedTrip.payments.trip_cost.toFixed(2)}</p>
+                      <p><strong>Client Cost:</strong> ₹{selectedTrip.payments.client_cost?.toFixed(2) || 'N/A'}</p>
+                      <p><strong>Gross Trip Profit:</strong> ₹{getTripGrossProfit(selectedTrip.payments) || 'N/A'}</p>
+                      <p><strong>Net Trip Profit:</strong> ₹{getTripEarnings(selectedTrip.payments) || 'N/A'}</p>
+                      <p><strong>Advance Payment:</strong> ₹{selectedTrip.payments.advance_payment.toFixed(2)}</p>
+                      <p><strong>Final Payment:</strong> ₹{selectedTrip.payments.final_payment.toFixed(2)}</p>
+                      {/* <p><strong>Toll Charges:</strong> ₹{selectedTrip.payments.toll_charges.toFixed(2)}</p> */}
+                      <p><strong>Halting Charges:</strong> ₹{selectedTrip.payments.halting_charges.toFixed(2)}</p>
+                      {/* <p><strong>Traffic Fines:</strong> ₹{selectedTrip.payments.traffic_fines.toFixed(2)}</p> */}
+                      <p><strong>Handling Charges:</strong> ₹{selectedTrip.payments.handling_charges.toFixed(2)}</p>
+                      <p><strong>Platform Fees:</strong> ₹{selectedTrip.payments.platform_fees.toFixed(2)}</p>
+                      {/* <p><strong>Platform Fines:</strong> ₹{selectedTrip.payments.platform_fines.toFixed(2)}</p> */}
+                      <p><strong>Payment Status:</strong> {selectedTrip.payments.payment_status}</p>
+                      <p><strong>Notes:</strong> {selectedTrip.payments.notes || 'N/A'}</p>
+                    </>
+                  ) : (
+                    <p>No payment information available.</p>
+                  )}
                 </CardContent>
               </Card>
               <h3 className="text-lg font-medium mt-6 mb-2">Associated Truck</h3>
