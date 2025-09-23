@@ -6,10 +6,13 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import Navbar from '@/components/ui/Navbar';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import { Users, Truck, Route, FileText, Search, Bell, UserCircle, UserRound, ChevronLeft, Menu } from 'lucide-react';
+import { Users, Truck, Route, FileText, Search, Bell, UserCircle, UserRound, ChevronLeft, Menu, Pencil } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -28,7 +31,7 @@ interface TruckOwnerDetails {
 }
 
 interface TruckOwner extends Profile {
-  truck_owners: TruckOwnerDetails[]; // Nested object for relation
+  truck_owners: TruckOwnerDetails[];
   aadhaar_or_pan: string;
   bank_account_number: string | null;
   bank_ifsc_code: string | null;
@@ -76,8 +79,11 @@ interface Trip {
   current_location: string | null;
   created_at: string;
   short_id: string;
+  driver_phone: number;
   origin: string;
   destination: string;
+  load_material: string;
+  load_weight: number;
   payments?: Payment;
 }
 
@@ -99,6 +105,40 @@ const formatDateDDMMYYYY = (date: string): string => {
   }
 };
 
+const formatCurrency = (num: number | null | undefined) => {
+    if (!num) return "₹0";
+    return "₹" + num.toLocaleString("en-IN");
+};
+
+const calculatePaymentCleared = (trip: any) => {
+    const advance_payment = trip.trip_payments?.advance_payment || 0;
+    const final_payment = trip.trip_payments?.final_payment || 0;
+    return advance_payment + final_payment;
+  }
+  const calculateBalance = (trip: any) => {
+    const tripCost = trip.trip_payments?.trip_cost || 0;
+     // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
+    const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
+    const deductions = [
+      trip.trip_payments?.advance_payment || 0,
+      trip.trip_payments?.final_payment || 0,
+      trip.trip_payments?.toll_charges || 0,
+      trip.trip_payments?.traffic_fines || 0,
+      trip.trip_payments?.handling_charges || 0,
+      trip.trip_payments?.platform_fees || 0,
+      trip.trip_payments?.platform_fines || 0,
+    ].reduce((a, b) => a + Number(b), 0);
+    // console.log("Payments for trip: " + trip.short_id,
+    //   {
+    //   "tripcost" : tripCost,
+    //   "deductions": deductions,
+    //   "halting charges": vehicle_halting_charges,
+    //   "final_payment" : final_payment
+    // }, "Formula: Balance = tripCost - final_payment - deduction + halting charges");
+    console.log("Balance for " + trip.short_id + " = " + (tripCost - deductions + vehicle_halting_charges));
+    return tripCost - deductions + vehicle_halting_charges;
+  };
+
 export default function ProfilesPage() {
   const [adminProfile, setAdminProfile] = useState<Profile | null>(null);
   const [truckOwners, setTruckOwners] = useState<TruckOwner[]>([]);
@@ -108,9 +148,36 @@ export default function ProfilesPage() {
   const [selectedOwner, setSelectedOwner] = useState<TruckOwner | null>(null);
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to open on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    phone: '',
+    role: 'truck_owner',
+    aadhaar_or_pan: '',
+    bank_account_number: '',
+    bank_ifsc_code: '',
+    upi_id: '',
+    town_city: '',
+  });
+  const [initialFormValues, setInitialFormValues] = useState({
+    full_name: '',
+    phone: '',
+    role: 'truck_owner',
+    aadhaar_or_pan: '',
+    bank_account_number: '',
+    bank_ifsc_code: '',
+    upi_id: '',
+    town_city: '',
+  });
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const router = useRouter();
+
+  // Check if any form field has changed
+  const hasChanges = Object.keys(editForm).some(
+    key => editForm[key as keyof typeof editForm] !== initialFormValues[key as keyof typeof initialFormValues]
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,7 +188,6 @@ export default function ProfilesPage() {
         return;
       }
 
-      // Fetch admin profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -133,7 +199,6 @@ export default function ProfilesPage() {
       }
       setAdminProfile(profileData);
 
-      // Fetch all truck owners (role = 'truck_owner') with nested truck_owners relation
       const { data: ownersData, error: ownersError } = await supabase
         .from('profiles')
         .select(`
@@ -148,32 +213,21 @@ export default function ProfilesPage() {
         `)
         .in('role', ['truck_owner', 'truck_agent'])
         .order('full_name', { ascending: true });
-      console.log('Fetched profiles:', ownersData, 'Count:', ownersData?.length || 0); // Debug log
-      console.log('Profile roles:', ownersData?.map(p => ({ id: p.id, full_name: p.full_name, role: p.role }))); // Debug log
       if (ownersError) console.error('Error fetching truck owners:', ownersError);
       const formattedOwners = ownersData?.map(owner => ({
         ...owner,
-        truck_owners: owner.role === 'truck_owner' ? (owner.truck_owners || {}) : {},
+        truck_owners: owner.truck_owners || [],
       })) || [];
-      console.log('Formatted owners for state:', formattedOwners.map(o => ({
-        id: o.id,
-        full_name: o.full_name,
-        role: o.role,
-        truck_owners: o.truck_owners
-      }))); // Debug log
       setTruckOwners(formattedOwners);
 
-      // Fetch trucks owned by all truck owners
       const ownerIds = ownersData?.map(o => o.id) || [];
       const { data: trucksData, error: trucksError } = await supabase
         .from('trucks')
         .select('*')
         .in('owner_id', ownerIds);
-      console.log('Fetched trucksData:', trucksData); // Debug log for trucks data
       if (trucksError) console.error('Error fetching trucks:', trucksError);
       setTrucks(trucksData || []);
 
-      // Fetch trips serviced by these trucks
       const truckIds = trucksData?.map(t => t.id) || [];
       const { data: tripsData, error: tripsError } = await supabase
         .from('trips')
@@ -187,7 +241,6 @@ export default function ProfilesPage() {
         `)
         .in('truck_id', truckIds)
         .order('created_at', { ascending: false });
-      console.log('Fetched tripsData:', tripsData); // Debug log for trips data
       if (tripsError) console.error('Error fetching trips:', tripsError);
       const formattedTrips = tripsData?.map(trip => ({
         ...trip,
@@ -203,7 +256,6 @@ export default function ProfilesPage() {
     fetchData();
   }, [router]);
 
-  // Set default "My Profile" view on laptop screens
   useEffect(() => {
     const handleResize = () => {
       if (window.matchMedia('(min-width: 768px)').matches) {
@@ -212,10 +264,132 @@ export default function ProfilesPage() {
         setSelectedTrip(null);
       }
     };
-    handleResize(); // Run on mount
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    if (!editForm.full_name.trim()) errors.full_name = 'Full name is required';
+    if (!editForm.phone.match(/^\+?[1-9]\d{1,14}$/)) errors.phone = 'Invalid phone number';
+    if (!editForm.aadhaar_or_pan.match(/^[A-Z0-9]{10}$|^[0-9]{12}$/)) {
+      errors.aadhaar_or_pan = 'Aadhaar (12 digits) or PAN (10 alphanumeric) required';
+    }
+    if (editForm.bank_ifsc_code && !editForm.bank_ifsc_code.match(/^[A-Z]{4}0[A-Z0-9]{6}$/)) {
+      errors.bank_ifsc_code = 'Invalid IFSC code';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleEditClick = () => {
+    if (selectedOwner) {
+      const initialValues = {
+        full_name: selectedOwner.full_name || '',
+        phone: selectedOwner.phone || '',
+        role: selectedOwner.role || 'truck_owner',
+        aadhaar_or_pan: selectedOwner.truck_owners[0]?.aadhaar_or_pan || '',
+        bank_account_number: selectedOwner.truck_owners[0]?.bank_account_number || '',
+        bank_ifsc_code: selectedOwner.truck_owners[0]?.bank_ifsc_code || '',
+        upi_id: selectedOwner.truck_owners[0]?.upi_id || '',
+        town_city: selectedOwner.truck_owners[0]?.town_city || '',
+      };
+      setEditForm(initialValues);
+      setInitialFormValues(initialValues);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!validateForm()) return;
+
+    try {
+      // Update profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editForm.full_name,
+          phone: editForm.phone,
+          role: editForm.role,
+        })
+        .eq('id', selectedOwner?.id);
+
+      if (profileError) throw profileError;
+
+      // Update or insert into truck_owners table
+      const { data: existingTruckOwner } = await supabase
+        .from('truck_owners')
+        .select('id')
+        .eq('profile_id', selectedOwner?.id)
+        .single();
+
+      if (existingTruckOwner) {
+        const { error: truckOwnerError } = await supabase
+          .from('truck_owners')
+          .update({
+            aadhaar_or_pan: editForm.aadhaar_or_pan,
+            bank_account_number: editForm.bank_account_number || null,
+            bank_ifsc_code: editForm.bank_ifsc_code || null,
+            upi_id: editForm.upi_id || null,
+            town_city: editForm.town_city || null,
+          })
+          .eq('profile_id', selectedOwner?.id);
+        if (truckOwnerError) throw truckOwnerError;
+      } else {
+        const { error: truckOwnerError } = await supabase
+          .from('truck_owners')
+          .insert({
+            profile_id: selectedOwner?.id,
+            aadhaar_or_pan: editForm.aadhaar_or_pan,
+            bank_account_number: editForm.bank_account_number || null,
+            bank_ifsc_code: editForm.bank_ifsc_code || null,
+            upi_id: editForm.upi_id || null,
+            town_city: editForm.town_city || null,
+          });
+        if (truckOwnerError) throw truckOwnerError;
+      }
+
+      // Update local state
+      setTruckOwners(prev =>
+        prev.map(owner =>
+          owner.id === selectedOwner?.id
+            ? {
+                ...owner,
+                full_name: editForm.full_name,
+                phone: editForm.phone,
+                role: editForm.role,
+                truck_owners: [{
+                  aadhaar_or_pan: editForm.aadhaar_or_pan,
+                  bank_account_number: editForm.bank_account_number || null,
+                  bank_ifsc_code: editForm.bank_ifsc_code || null,
+                  upi_id: editForm.upi_id || null,
+                  town_city: editForm.town_city || null,
+                }],
+              }
+            : owner
+        )
+      );
+      setSelectedOwner({
+        ...selectedOwner!,
+        full_name: editForm.full_name,
+        phone: editForm.phone,
+        role: editForm.role,
+        truck_owners: [{
+          aadhaar_or_pan: editForm.aadhaar_or_pan,
+          bank_account_number: editForm.bank_account_number || null,
+          bank_ifsc_code: editForm.bank_ifsc_code || null,
+          upi_id: editForm.upi_id || null,
+          town_city: editForm.town_city || null,
+        }],
+      });
+      setIsEditModalOpen(false);
+      setFormErrors({});
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setFormErrors({ general: 'Failed to update profile. Please try again.' });
+    }
+  };
 
   const filteredOwners = truckOwners.filter(owner =>
     owner.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -233,7 +407,7 @@ export default function ProfilesPage() {
   const getTripOwner = (trip: Trip) => truckOwners.find(o => getOwnerTrucks(o.id).some(t => t.id === trip.truck_id));
   
   const getTripGrossProfit = (payment: Payment) => {
-    return (payment.client_cost? payment.client_cost : 0) - (payment.trip_cost);
+    return formatCurrency((payment.client_cost? payment.client_cost : 0) - (payment.trip_cost));
   };
 
   const getTripEarnings = (payment: Payment) => {
@@ -241,13 +415,10 @@ export default function ProfilesPage() {
     if (client_cost === 0) return 0;
     if (payment.advance_payment === 0 || payment.final_payment === 0) return 0;
     const amount_paid_to_vehicle_provider = payment.advance_payment + payment.final_payment + payment.halting_charges;
-    return client_cost - amount_paid_to_vehicle_provider;
+    return formatCurrency(client_cost - amount_paid_to_vehicle_provider);
   }
 
   if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
-
-  console.log('Current selectedOwner:', selectedOwner); // Debug log for selected owner
-  console.log('Current isSidebarOpen:', isSidebarOpen); // Debug log for sidebar state
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -281,7 +452,6 @@ export default function ProfilesPage() {
                 setSelectedTruck(null);
                 setSelectedTrip(null);
                 setIsSidebarOpen(false);
-                // console.log('Selected provider:', { id: owner.id, full_name: owner.full_name, role: owner.role });
               }}
             >
               <div className="flex items-center">
@@ -294,8 +464,6 @@ export default function ProfilesPage() {
                 key={owner.id}
                 className={`p-2 rounded cursor-pointer hover:bg-gray-200 ${selectedOwner?.id === owner.id && !selectedTruck && !selectedTrip ? 'bg-blue-100' : ''}`}
                 onClick={() => {
-                  console.log("Setting owner")
-                  console.log(owner)
                   setSelectedOwner(owner);
                   setSelectedTruck(null);
                   setSelectedTrip(null);
@@ -370,16 +538,13 @@ export default function ProfilesPage() {
                 <p><strong>Role:</strong> {adminProfile?.role || 'N/A'}</p>
                 <p><strong>Joined:</strong> {new Date(adminProfile?.created_at || '').toLocaleDateString()}</p>
               </CardContent>
-                <CardFooter className="pt-4">
-                  <a
-                    href="/truck-owners?returnTo=/profiles"
-                    className="w-full"
-                  >
-                    <button className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
-                      Onboard New Vehicle Provider
-                    </button>
-                  </a>
-                </CardFooter>
+              <CardFooter className="pt-4">
+                <a href="/truck-owners?returnTo=/profiles" className="w-full">
+                  <button className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
+                    Onboard New Vehicle Provider
+                  </button>
+                </a>
+              </CardFooter>
             </Card>
           )}
 
@@ -403,25 +568,135 @@ export default function ProfilesPage() {
                 Back
               </Button>
               <div>
-                <div className="flex items-center mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">{selectedOwner.full_name}</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditClick}
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    <Pencil size={16} className="mr-2" />
+                    Edit
+                  </Button>
                 </div>
 
                 <Card className="bg-white mb-6">
-                  {/* <CardHeader>
-                    <h3 className="text-lg font-medium">Profile Details</h3>
-                  </CardHeader> */}
                   <CardContent className="mt-4 space-y-4">
                     <p><strong>Role:</strong> {selectedOwner.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
                     <p><strong>Phone:</strong> {selectedOwner.phone}</p>
-                    <p><strong>Aadhar / PAN:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner.truck_owners[0]?.aadhaar_or_pan || 'N/A') : 'N/A'}</p>
-                    <p><strong>City:</strong> {selectedOwner.role === 'truck_owner' ? (selectedOwner?.truck_owners[0]?.town_city || 'N/A') : 'N/A'}</p>
-                    {selectedOwner?.truck_owners[0]?.bank_account_number && (<p><strong>Account Number:</strong> {selectedOwner?.truck_owners[0]?.bank_account_number}</p>)}
-                    {selectedOwner?.truck_owners[0]?.bank_ifsc_code && (<p><strong>IFSC Number:</strong> {selectedOwner?.truck_owners[0]?.bank_ifsc_code}</p>)}
-                    {selectedOwner?.truck_owners[0]?.upi_id && (<p><strong>UPI ID:</strong> {selectedOwner?.truck_owners[0]?.upi_id}</p>)}
+                    <p><strong>Aadhar / PAN:</strong> {selectedOwner.truck_owners[0]?.aadhaar_or_pan || 'N/A'}</p>
+                    <p><strong>City:</strong> {selectedOwner.truck_owners[0]?.town_city || 'N/A'}</p>
+                    {selectedOwner.truck_owners[0]?.bank_account_number && (
+                      <p><strong>Account Number:</strong> {selectedOwner.truck_owners[0].bank_account_number}</p>
+                    )}
+                    {selectedOwner.truck_owners[0]?.bank_ifsc_code && (
+                      <p><strong>IFSC Number:</strong> {selectedOwner.truck_owners[0].bank_ifsc_code}</p>
+                    )}
+                    {selectedOwner.truck_owners[0]?.upi_id && (
+                      <p><strong>UPI ID:</strong> {selectedOwner.truck_owners[0].upi_id}</p>
+                    )}
                     <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
                   </CardContent>
                 </Card>
+
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                  <DialogContent className="max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Edit Profile</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="full_name">Full Name</Label>
+                        <Input
+                          id="full_name"
+                          value={editForm.full_name}
+                          onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                          className={formErrors.full_name ? 'border-red-500' : ''}
+                        />
+                        {formErrors.full_name && <p className="text-red-500 text-sm">{formErrors.full_name}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                          id="phone"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                          className={formErrors.phone ? 'border-red-500' : ''}
+                        />
+                        {formErrors.phone && <p className="text-red-500 text-sm">{formErrors.phone}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="role">Role</Label>
+                        <Select
+                          value={editForm.role}
+                          onValueChange={(value) => setEditForm({ ...editForm, role: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="truck_owner">Truck Owner</SelectItem>
+                            <SelectItem value="truck_agent">Truck Agent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="aadhaar_or_pan">Aadhaar / PAN</Label>
+                        <Input
+                          id="aadhaar_or_pan"
+                          value={editForm.aadhaar_or_pan}
+                          onChange={(e) => setEditForm({ ...editForm, aadhaar_or_pan: e.target.value })}
+                          className={formErrors.aadhaar_or_pan ? 'border-red-500' : ''}
+                        />
+                        {formErrors.aadhaar_or_pan && <p className="text-red-500 text-sm">{formErrors.aadhaar_or_pan}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="town_city">City</Label>
+                        <Input
+                          id="town_city"
+                          value={editForm.town_city}
+                          onChange={(e) => setEditForm({ ...editForm, town_city: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bank_account_number">Bank Account Number</Label>
+                        <Input
+                          id="bank_account_number"
+                          value={editForm.bank_account_number}
+                          onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bank_ifsc_code">IFSC Code</Label>
+                        <Input
+                          id="bank_ifsc_code"
+                          value={editForm.bank_ifsc_code}
+                          onChange={(e) => setEditForm({ ...editForm, bank_ifsc_code: e.target.value })}
+                          className={formErrors.bank_ifsc_code ? 'border-red-500' : ''}
+                        />
+                        {formErrors.bank_ifsc_code && <p className="text-red-500 text-sm">{formErrors.bank_ifsc_code}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="upi_id">UPI ID</Label>
+                        <Input
+                          id="upi_id"
+                          value={editForm.upi_id}
+                          onChange={(e) => setEditForm({ ...editForm, upi_id: e.target.value })}
+                        />
+                      </div>
+                      {formErrors.general && <p className="text-red-500 text-sm">{formErrors.general}</p>}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveChanges} disabled={!hasChanges}>
+                        Save Changes
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <Card className="bg-white">
@@ -528,15 +803,15 @@ export default function ProfilesPage() {
                 </CardContent>
               </Card>
               <h3 className="text-lg font-medium mt-6 mb-2">Trips</h3>
-              {getTruckTrips(selectedTruck.id).length === 0 ? (
+              {getOwnerTrips(selectedTruck.owner_id).length === 0 ? (
                 <p>No trips serviced.</p>
               ) : (
                 <ul className="space-y-2">
-                  {getTruckTrips(selectedTruck.id).map(trip => (
+                  {getOwnerTrips(selectedTruck.owner_id).map(trip => (
                     <li
                       key={trip.id}
                       className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
-                      onClick={() => {console.log(trip); setSelectedTrip(trip);}}
+                      onClick={() => { setSelectedTrip(trip); }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -575,9 +850,11 @@ export default function ProfilesPage() {
                   <p><strong>ID:</strong> {selectedTrip.short_id}</p>
                   <p><strong>Route:</strong> {selectedTrip.origin} → {selectedTrip.destination}</p>
                   <p><strong>Status:</strong> {selectedTrip.status}</p>
-                  <p><strong>Start Time:</strong> {selectedTrip.start_time ? new Date(selectedTrip.start_time).toLocaleString() : 'N/A'}</p>
-                  <p><strong>End Time:</strong> {selectedTrip.end_time ? new Date(selectedTrip.end_time).toLocaleString() : 'N/A'}</p>
+                  <p><strong>Start Time:</strong> {selectedTrip.start_time ? formatDateDDMMYYYY(selectedTrip.start_time) : 'N/A'}</p>
+                  <p><strong>End Time:</strong> {selectedTrip.end_time ? formatDateDDMMYYYY(selectedTrip.end_time) : 'N/A'}</p>
                   <p><strong>Created:</strong> {formatDateDDMMYYYY(selectedTrip.created_at)}</p>
+                  <p><strong>Driver Phone:</strong> {selectedTrip.driver_phone}</p>
+                  {selectedTrip.load_material ? (<p><strong>Load:</strong> {selectedTrip.load_material} - {selectedTrip.load_weight}</p>) : (<></>)}
                 </CardContent>
               </Card>
               <Card className="bg-white mb-6">
@@ -587,20 +864,20 @@ export default function ProfilesPage() {
                 <CardContent className="space-y-4">
                   {selectedTrip.payments ? (
                     <>
-                      <p><strong>Trip Cost:</strong> ₹{selectedTrip.payments.trip_cost.toFixed(2)}</p>
-                      <p><strong>Client Cost:</strong> ₹{selectedTrip.payments.client_cost?.toFixed(2) || 'N/A'}</p>
-                      <p><strong>Gross Trip Profit:</strong> ₹{getTripGrossProfit(selectedTrip.payments) || 'N/A'}</p>
-                      <p><strong>Net Trip Profit:</strong> ₹{getTripEarnings(selectedTrip.payments) || 'N/A'}</p>
-                      <p><strong>Advance Payment:</strong> ₹{selectedTrip.payments.advance_payment.toFixed(2)}</p>
-                      <p><strong>Final Payment:</strong> ₹{selectedTrip.payments.final_payment.toFixed(2)}</p>
-                      {/* <p><strong>Toll Charges:</strong> ₹{selectedTrip.payments.toll_charges.toFixed(2)}</p> */}
-                      <p><strong>Halting Charges:</strong> ₹{selectedTrip.payments.halting_charges.toFixed(2)}</p>
-                      {/* <p><strong>Traffic Fines:</strong> ₹{selectedTrip.payments.traffic_fines.toFixed(2)}</p> */}
-                      <p><strong>Handling Charges:</strong> ₹{selectedTrip.payments.handling_charges.toFixed(2)}</p>
-                      <p><strong>Platform Fees:</strong> ₹{selectedTrip.payments.platform_fees.toFixed(2)}</p>
-                      {/* <p><strong>Platform Fines:</strong> ₹{selectedTrip.payments.platform_fines.toFixed(2)}</p> */}
+                      <p><strong>Client Cost:</strong> {formatCurrency(selectedTrip.payments.client_cost)}</p>
+                      <p><strong>Trip Cost:</strong> {formatCurrency(selectedTrip.payments.trip_cost)}</p>
+                      <p><strong>Gross Trip Profit:</strong> {getTripGrossProfit(selectedTrip.payments)}</p>
+                      <p><strong>Net Trip Profit:</strong> {getTripEarnings(selectedTrip.payments)}</p>
+                      <p><strong>Advance Payment:</strong> {formatCurrency(selectedTrip.payments.advance_payment)}</p>
+                      <p><strong>Final Payment:</strong> {formatCurrency(selectedTrip.payments.final_payment)}</p>
+                      <p><strong>Halting Charges:</strong> {formatCurrency(selectedTrip.payments.halting_charges)}</p>
+                      <p><strong>Handling Charges:</strong> {formatCurrency(selectedTrip.payments.handling_charges)}</p>
+                      <p><strong>Platform Fees:</strong> {formatCurrency(selectedTrip.payments.platform_fees)}</p>
                       <p><strong>Payment Status:</strong> {selectedTrip.payments.payment_status}</p>
+                      <p className="text-lg font-extrabold"><strong>Payment Cleared:</strong> {formatCurrency(calculatePaymentCleared(selectedTrip))}</p>
+                      <p className="text-lg font-extrabold"><strong>Balance Pending:</strong> {formatCurrency(calculateBalance(selectedTrip))}</p>
                       <p><strong>Notes:</strong> {selectedTrip.payments.notes || 'N/A'}</p>
+                      <h5 className='text-sm'>(Platform Fees is included into "Net Trip Profit")</h5>
                     </>
                   ) : (
                     <p>No payment information available.</p>

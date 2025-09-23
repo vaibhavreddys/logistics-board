@@ -526,7 +526,7 @@ export default function TripsPage() {
                           </div>
 
                           {/* Center: Date */}
-                          <span className="text-xs text-indigo-200">{new Date(i.created_at).toLocaleDateString()}</span>
+                          <span className="text-xs text-indigo-200">{formatDateDDMMYYYY(i.created_at)}</span>
 
                           {/* Right: Status button + Edit icon */}
                           <div className="flex items-center gap-1">
