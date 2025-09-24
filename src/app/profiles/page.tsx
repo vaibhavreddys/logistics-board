@@ -66,7 +66,6 @@ interface Payment {
   updated_at: string;
   final_payment: number;
   client_cost: number | null;
-  // trip_profit: number | null;
 }
 
 interface Trip {
@@ -85,6 +84,7 @@ interface Trip {
   load_material: string;
   load_weight: number;
   payments?: Payment;
+  profile?: Profile;
 }
 
 // Custom function for dd/mm/yyyy HH:mm format
@@ -106,38 +106,44 @@ const formatDateDDMMYYYY = (date: string): string => {
 };
 
 const formatCurrency = (num: number | null | undefined) => {
-    if (!num) return "₹0";
-    return "₹" + num.toLocaleString("en-IN");
+  if (!num) return "₹0";
+  return "₹" + num.toLocaleString("en-IN");
 };
 
 const calculatePaymentCleared = (trip: any) => {
-    const advance_payment = trip.trip_payments?.advance_payment || 0;
-    const final_payment = trip.trip_payments?.final_payment || 0;
-    return advance_payment + final_payment;
-  }
-  const calculateBalance = (trip: any) => {
-    const tripCost = trip.trip_payments?.trip_cost || 0;
-     // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
-    const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
-    const deductions = [
-      trip.trip_payments?.advance_payment || 0,
-      trip.trip_payments?.final_payment || 0,
-      trip.trip_payments?.toll_charges || 0,
-      trip.trip_payments?.traffic_fines || 0,
-      trip.trip_payments?.handling_charges || 0,
-      trip.trip_payments?.platform_fees || 0,
-      trip.trip_payments?.platform_fines || 0,
-    ].reduce((a, b) => a + Number(b), 0);
-    // console.log("Payments for trip: " + trip.short_id,
-    //   {
-    //   "tripcost" : tripCost,
-    //   "deductions": deductions,
-    //   "halting charges": vehicle_halting_charges,
-    //   "final_payment" : final_payment
-    // }, "Formula: Balance = tripCost - final_payment - deduction + halting charges");
-    console.log("Balance for " + trip.short_id + " = " + (tripCost - deductions + vehicle_halting_charges));
-    return tripCost - deductions + vehicle_halting_charges;
-  };
+  const advance_payment = trip.trip_payments?.advance_payment || 0;
+  const final_payment = trip.trip_payments?.final_payment || 0;
+  return advance_payment + final_payment;
+};
+
+const calculateBalance = (trip: any) => {
+  const tripCost = trip.trip_payments?.trip_cost || 0;
+  // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
+  const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
+  const deductions = [
+    trip.trip_payments?.advance_payment || 0,
+    trip.trip_payments?.final_payment || 0,
+    trip.trip_payments?.toll_charges || 0,
+    trip.trip_payments?.traffic_fines || 0,
+    trip.trip_payments?.handling_charges || 0,
+    trip.trip_payments?.platform_fees || 0,
+    trip.trip_payments?.platform_fines || 0,
+  ].reduce((a, b) => a + Number(b), 0);
+  console.log("Balance for " + trip.short_id + " = " + (tripCost - deductions + vehicle_halting_charges));
+  return tripCost - deductions + vehicle_halting_charges;
+};
+
+const getTripGrossProfit = (payment: Payment) => {
+  return formatCurrency((payment.client_cost ? payment.client_cost : 0) - payment.trip_cost);
+};
+
+const getTripEarnings = (payment: Payment) => {
+  const client_cost = payment.client_cost ? payment.client_cost : 0;
+  if (client_cost === 0) return 0;
+  if (payment.advance_payment === 0 || payment.final_payment === 0) return 0;
+  const amount_paid_to_vehicle_provider = payment.advance_payment + payment.final_payment + payment.halting_charges;
+  return formatCurrency(client_cost - amount_paid_to_vehicle_provider);
+};
 
 export default function ProfilesPage() {
   const [adminProfile, setAdminProfile] = useState<Profile | null>(null);
@@ -235,9 +241,18 @@ export default function ProfilesPage() {
           *,
           indents!trips_indent_id_fkey (
             origin,
-            destination
+            destination,
+            load_material,
+            load_weight_kg
           ),
-          trip_payments!trip_payments_trip_id_fkey (*)
+          trip_payments!trip_payments_trip_id_fkey (*),
+          profiles!trips_truck_provider_id_fkey (
+            id,
+            full_name,
+            phone,
+            role,
+            created_at
+          )
         `)
         .in('truck_id', truckIds)
         .order('created_at', { ascending: false });
@@ -246,9 +261,14 @@ export default function ProfilesPage() {
         ...trip,
         origin: trip.indents?.origin || 'N/A',
         destination: trip.indents?.destination || 'N/A',
+        load_material: trip.indents?.load_material || '',
+        load_weight: trip.indents?.load_weight_kg || 0,
         payments: trip.trip_payments,
+        profile: trip.profiles,
+        driver_phone: trip.driver_phone || 0,
       })) || [];
       setTrips(formattedTrips);
+      console.log("Formatted Trips: ", formattedTrips);
 
       setLoading(false);
     };
@@ -400,8 +420,10 @@ export default function ProfilesPage() {
   const getOwnerTrucks = (ownerId: string) => trucks.filter(t => t.owner_id === ownerId);
   const getTruckTrips = (truckId: string) => trips.filter(t => t.truck_id === truckId);
   const getOwnerTrips = (ownerId: string) => {
-    const ownerTruckIds = getOwnerTrucks(ownerId).map(t => t.id);
-    return trips.filter(t => t.truck_id && ownerTruckIds.includes(t.truck_id));
+    // const ownerTruckIds = getOwnerTrucks(ownerId).map(t => t.id);
+    // return trips.filter(t => t.truck_id && ownerTruckIds.includes(t.truck_id));
+    console.log("Filtered trips for owner id : ", ownerId);
+    return trips.filter(t => t.profile?.id === ownerId)
   };
   const getTripTruck = (trip: Trip) => trucks.find(t => t.id === trip.truck_id);
   const getTripOwner = (trip: Trip) => truckOwners.find(o => getOwnerTrucks(o.id).some(t => t.id === trip.truck_id));
@@ -479,7 +501,8 @@ export default function ProfilesPage() {
                     )}
                     {owner.full_name}
                   </div>
-                  <Badge variant="secondary" 
+                  <Badge
+                    variant="secondary"
                     className={`ml-2 text-xs hover:bg-black-200 ${owner.role === 'truck_owner' ? 'bg-blue-500' : 'bg-green-500'} text-white`}
                   >
                     {getOwnerTrucks(owner.id).length} 🚚
@@ -790,11 +813,12 @@ export default function ProfilesPage() {
                 <ChevronLeft size={16} className="mr-2" />
                 Back to Owner
               </Button>
+              <h3 className="text-lg font-semibold mt-6 mb-1">Truck Details</h3>
               <Card className="bg-white mb-6">
-                <CardHeader>
-                  <h2 className="text-xl font-semibold">Truck Details</h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                {/* <CardHeader>
+                  <h2 className="text-xl font-semibold"></h2>
+                </CardHeader> */}
+                <CardContent className="space-y-4 mt-4">
                   <p><strong>Number:</strong> {selectedTruck.vehicle_number}</p>
                   <p><strong>Type:</strong> {selectedTruck.vehicle_type}</p>
                   <p><strong>Capacity:</strong> {selectedTruck.capacity_kg || 'N/A'} kg</p>
@@ -802,12 +826,12 @@ export default function ProfilesPage() {
                   <p><strong>Owner:</strong> {truckOwners.find(o => o.id === selectedTruck.owner_id)?.full_name || 'N/A'}</p>
                 </CardContent>
               </Card>
-              <h3 className="text-lg font-medium mt-6 mb-2">Trips</h3>
-              {getOwnerTrips(selectedTruck.owner_id).length === 0 ? (
+              <h3 className="text-lg font-semibold mt-6 mb-1">Trips</h3>
+              {getTruckTrips(selectedTruck.id).length === 0 ? (
                 <p>No trips serviced.</p>
               ) : (
                 <ul className="space-y-2">
-                  {getOwnerTrips(selectedTruck.owner_id).map(trip => (
+                  {getTruckTrips(selectedTruck.id).map(trip => (
                     <li
                       key={trip.id}
                       className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -842,11 +866,12 @@ export default function ProfilesPage() {
                 <ChevronLeft size={16} className="mr-2" />
                 Back to {selectedTruck ? 'Truck' : 'Owner'}
               </Button>
+              <h3 className="text-lg font-semibold mt-6 mb-1">Trip Details</h3>
               <Card className="bg-white mb-6">
-                <CardHeader>
+                {/* <CardHeader>
                   <h2 className="text-xl font-semibold">Trip Details</h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </CardHeader> */}
+                <CardContent className="space-y-4 mt-4">
                   <p><strong>ID:</strong> {selectedTrip.short_id}</p>
                   <p><strong>Route:</strong> {selectedTrip.origin} → {selectedTrip.destination}</p>
                   <p><strong>Status:</strong> {selectedTrip.status}</p>
@@ -854,14 +879,21 @@ export default function ProfilesPage() {
                   <p><strong>End Time:</strong> {selectedTrip.end_time ? formatDateDDMMYYYY(selectedTrip.end_time) : 'N/A'}</p>
                   <p><strong>Created:</strong> {formatDateDDMMYYYY(selectedTrip.created_at)}</p>
                   <p><strong>Driver Phone:</strong> {selectedTrip.driver_phone}</p>
-                  {selectedTrip.load_material ? (<p><strong>Load:</strong> {selectedTrip.load_material} - {selectedTrip.load_weight}</p>) : (<></>)}
+                  {selectedTrip.load_material ? (
+                    <p><strong>Load:</strong> {selectedTrip.load_material} | {selectedTrip.load_weight} MT</p>
+                  ) : (
+                    <></>
+                  )}
+                  <p><strong>Trip Placed By:</strong> {selectedTrip.profile?.full_name} ({selectedTrip.profile?.role === "truck_agent" ? "Truck Agent" : "Truck Owner"})</p>
                 </CardContent>
               </Card>
+              <h3 className="text-lg font-semibold mt-6 mb-1">Payment Information</h3>
               <Card className="bg-white mb-6">
-                <CardHeader>
+                {/* <CardHeader>
                   <h3 className="text-lg font-semibold">Payment Information</h3>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </CardHeader> */}
+                <CardContent className="space-y-4 mt-4">
+                  {/* <br></br> */}
                   {selectedTrip.payments ? (
                     <>
                       <p><strong>Client Cost:</strong> {formatCurrency(selectedTrip.payments.client_cost)}</p>
@@ -884,10 +916,10 @@ export default function ProfilesPage() {
                   )}
                 </CardContent>
               </Card>
-              <h3 className="text-lg font-medium mt-6 mb-2">Associated Truck</h3>
+              <h3 className="text-lg font-semibold mt-6 mb-1">Associated Truck</h3>
               {getTripTruck(selectedTrip) ? (
                 <Card className="bg-white">
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 mt-4">
                     <p><strong>Number:</strong> {getTripTruck(selectedTrip)?.vehicle_number}</p>
                     <p><strong>Type:</strong> {getTripTruck(selectedTrip)?.vehicle_type}</p>
                     <p><strong>Active:</strong> {getTripTruck(selectedTrip)?.active ? 'Yes' : 'No'}</p>
@@ -896,6 +928,19 @@ export default function ProfilesPage() {
                 </Card>
               ) : (
                 <p>No associated truck found.</p>
+              )}
+              <h3 className="text-lg font-semibold mt-6 mb-1">Truck Provider</h3>
+              {selectedTrip.profile? (
+                <Card className="bg-white">
+                  <CardContent className="space-y-4 mt-4">
+                    <p><strong>Name:</strong> {selectedTrip.profile?.full_name || 'N/A'}</p>
+                    <p><strong>Phone:</strong> {selectedTrip.profile.phone || 'N/A'}</p>
+                    <p><strong>Role:</strong> {selectedTrip.profile.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
+                    <p><strong>Joined:</strong> {new Date(selectedTrip.profile.created_at).toLocaleDateString()}</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <p>No truck provider information available.</p>
               )}
             </div>
           )}
