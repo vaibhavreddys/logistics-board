@@ -683,6 +683,7 @@ export default function IndentsPage() {
           .insert({
             indent_id: selectedIndentId,
             client_cost: currentIndent.client_cost,
+            trip_cost: currentIndent.trip_cost,
             short_id: currentIndent.short_id,
             truck_id: selectedTruck.id,
             truck_provider_id: truckProviderId,
@@ -1100,7 +1101,7 @@ export default function IndentsPage() {
                           Placement At
                         </div>
                         <div className="text-gray-800 font-semibold text-right break-words whitespace-pre-wrap">
-                          {new Date(i.pickup_at).toLocaleString()}
+                          {formatDateDDMMYYYY(i.pickup_at)}
                         </div>
                       </div>
                     )}
@@ -1231,8 +1232,8 @@ export default function IndentsPage() {
                               { label: 'Load', value: i.load_weight_kg ? `${i.load_weight_kg} MT` : 'NA'},
                               { label: 'Material', value: `${i.load_material || ''}`.trim() || 'NA' },
                               { label: 'Placement At', value: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA' },
-                              { label: 'Client', value: i.clients?.name || 'NA' },
-                              { label: 'Trip Cost', value: i.trip_cost ? `₹${i.trip_cost}` : 'NA' },
+                              // { label: 'Client', value: i.clients?.name || 'NA' },
+                              // { label: 'Trip Cost', value: i.trip_cost ? `₹${i.trip_cost}` : 'NA' },
                               { label: 'Load ID', value: i.short_id },
                             ],
                           };
