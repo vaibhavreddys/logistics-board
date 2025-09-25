@@ -763,7 +763,15 @@ export default function ProfilesPage() {
                                   }
                                   className="text-xs"
                                 >
-                                  {trip.status}
+                                  {
+                                    trip.status === "completed"
+                                      ? "COMPLETED"
+                                      : trip.status === "started"
+                                      ? "STARTED"
+                                      : trip.status === "cancelled"
+                                      ? "CANCELLED"
+                                      : ""
+                                  }
                                 </Badge>
                               </div>
                             </li>
