@@ -604,24 +604,7 @@ export default function ProfilesPage() {
                   </Button>
                 </div>
 
-                <Card className="bg-white mb-6">
-                  <CardContent className="mt-4 space-y-4">
-                    <p><strong>Role:</strong> {selectedOwner.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
-                    <p><strong>Phone:</strong> {selectedOwner.phone}</p>
-                    <p><strong>Aadhar / PAN:</strong> {selectedOwner.truck_owners[0]?.aadhaar_or_pan || 'N/A'}</p>
-                    <p><strong>City:</strong> {selectedOwner.truck_owners[0]?.town_city || 'N/A'}</p>
-                    {selectedOwner.truck_owners[0]?.bank_account_number && (
-                      <p><strong>Account Number:</strong> {selectedOwner.truck_owners[0].bank_account_number}</p>
-                    )}
-                    {selectedOwner.truck_owners[0]?.bank_ifsc_code && (
-                      <p><strong>IFSC Number:</strong> {selectedOwner.truck_owners[0].bank_ifsc_code}</p>
-                    )}
-                    {selectedOwner.truck_owners[0]?.upi_id && (
-                      <p><strong>UPI ID:</strong> {selectedOwner.truck_owners[0].upi_id}</p>
-                    )}
-                    <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
-                  </CardContent>
-                </Card>
+                
 
                 <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                   <DialogContent className="max-h-[80vh] overflow-y-auto">
@@ -721,7 +704,74 @@ export default function ProfilesPage() {
                   </DialogContent>
                 </Dialog>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                
+                <div className="grid md:grid-cols-[minmax(200px,0.8fr)_1.2fr] md:auto-rows-auto gap-6">
+                  <Card className="bg-white">
+                    <CardContent className="mt-4 space-y-4">
+                      <p><strong>Role:</strong> {selectedOwner.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
+                      <p><strong>Phone:</strong> {selectedOwner.phone}</p>
+                      <p><strong>Aadhar / PAN:</strong> {selectedOwner.truck_owners[0]?.aadhaar_or_pan || 'N/A'}</p>
+                      <p><strong>City:</strong> {selectedOwner.truck_owners[0]?.town_city || 'N/A'}</p>
+                      {selectedOwner.truck_owners[0]?.bank_account_number && (
+                        <p><strong>Account Number:</strong> {selectedOwner.truck_owners[0].bank_account_number}</p>
+                      )}
+                      {selectedOwner.truck_owners[0]?.bank_ifsc_code && (
+                        <p><strong>IFSC Number:</strong> {selectedOwner.truck_owners[0].bank_ifsc_code}</p>
+                      )}
+                      {selectedOwner.truck_owners[0]?.upi_id && (
+                        <p><strong>UPI ID:</strong> {selectedOwner.truck_owners[0].upi_id}</p>
+                      )}
+                      <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white md:row-span-2">
+                    <CardHeader>
+                      <h3 className="text-lg font-medium flex items-center">
+                        <Route size={20} className="mr-2" />
+                        Trips ({getOwnerTrips(selectedOwner.id).length})
+                      </h3>
+                    </CardHeader>
+                    <CardContent>
+                      {getOwnerTrips(selectedOwner.id).length === 0 ? (
+                        <p className="text-gray-500">No trips serviced.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {getOwnerTrips(selectedOwner.id).map(trip => (
+                            <li
+                              key={trip.id}
+                              className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setSelectedTrip(trip);
+                                setSelectedTruck(selectedTruck);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium">{trip.origin} ⮕ {trip.destination} ({getTripTruck(trip)?.vehicle_number} - {getTripTruck(trip)?.vehicle_type})</p>
+                                  <p className="text-sm text-gray-500">{trip.short_id} | Trip Cost: {formatCurrency(trip.payments?.trip_cost)}</p>
+                                  <p className="text-sm text-gray-500">Balance: {formatCurrency(calculateBalance(trip))}</p>
+                                </div>
+                                <Badge
+                                  variant={
+                                    trip.status === "completed"
+                                      ? "default"
+                                      : trip.status === "started"
+                                      ? "success"
+                                      : trip.status === "cancelled"
+                                      ? "destructive"
+                                      : "default"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {trip.status}
+                                </Badge>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
                   <Card className="bg-white">
                     <CardHeader>
                       <h3 className="text-lg font-medium flex items-center">
@@ -750,43 +800,6 @@ export default function ProfilesPage() {
                                 </div>
                                 <Badge variant="secondary" className="text-xs">
                                   {truck.active ? 'Active' : 'Inactive'}
-                                </Badge>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-white">
-                    <CardHeader>
-                      <h3 className="text-lg font-medium flex items-center">
-                        <Route size={20} className="mr-2" />
-                        Trips ({getOwnerTrips(selectedOwner.id).length})
-                      </h3>
-                    </CardHeader>
-                    <CardContent>
-                      {getOwnerTrips(selectedOwner.id).length === 0 ? (
-                        <p className="text-gray-500">No trips serviced.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {getOwnerTrips(selectedOwner.id).map(trip => (
-                            <li
-                              key={trip.id}
-                              className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setSelectedTrip(trip);
-                                setSelectedTruck(selectedTruck);
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-medium">{trip.short_id}</p>
-                                  <p className="text-sm text-gray-500">{trip.origin} → {trip.destination}</p>
-                                </div>
-                                <Badge variant={trip.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-                                  {trip.status}
                                 </Badge>
                               </div>
                             </li>
