@@ -353,7 +353,7 @@ export default function IndentsPage() {
 
       // === Two-column details ===
       let y = 100;
-      ctx.font = "12px Arial";
+      ctx.font = "14px Arial";
       ctx.fillStyle = "#fff";
 
       for (let i = 0; i < rows; i++) {
