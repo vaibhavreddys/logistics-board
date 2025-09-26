@@ -761,7 +761,7 @@ export default function ProfilesPage() {
                                       ? "destructive"
                                       : "default"
                                   }
-                                  className="text-xs"
+                                  className="text-[8px]"
                                 >
                                   {
                                     trip.status === "completed"
@@ -842,7 +842,7 @@ export default function ProfilesPage() {
                 <CardContent className="space-y-4 mt-4">
                   <p><strong>Number:</strong> {selectedTruck.vehicle_number}</p>
                   <p><strong>Type:</strong> {selectedTruck.vehicle_type}</p>
-                  <p><strong>Capacity:</strong> {selectedTruck.capacity_kg || 'N/A'} kg</p>
+                  <p><strong>Capacity:</strong> {selectedTruck.capacity_kg || 'N/A'} MT</p>
                   <p><strong>Active:</strong> {selectedTruck.active ? 'Yes' : 'No'}</p>
                   <p><strong>Owner:</strong> {truckOwners.find(o => o.id === selectedTruck.owner_id)?.full_name || 'N/A'}</p>
                 </CardContent>

@@ -756,7 +756,7 @@ export default function TripsPage() {
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-100">Weight</td>
-                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.load_weight_kg || 'N/A'} kg</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.load_weight_kg || 'N/A'} MT</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Driver Phone</td>

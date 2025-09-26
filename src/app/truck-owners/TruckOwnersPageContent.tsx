@@ -170,7 +170,7 @@ export default function TruckOwnersPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="aadhaar_or_pan">Aadhaar or PAN *</Label>
+                  <Label htmlFor="aadhaar_or_pan">Aadhaar or PAN</Label>
                   <div className="relative">
                     <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <Input
@@ -178,7 +178,7 @@ export default function TruckOwnersPage() {
                       placeholder="123456789012 or ABCDE1234F"
                       className="pl-10"
                       {...register('aadhaar_or_pan', {
-                        required: 'Aadhaar or PAN is required',
+                        // required: 'Aadhaar or PAN is required',
                         pattern: {
                           value: /^[A-Z0-9]{10}$|^[0-9]{12}$/,
                           message: 'Enter a valid 12-digit Aadhaar or 10-character PAN',

@@ -256,7 +256,7 @@ export default function TruckOwnerViewPage() {
                   <div>
                     <div className="font-semibold">{truck.vehicle_number}</div>
                     <div className="text-sm">Type: {truck.vehicle_type}</div>
-                    <div className="text-sm">Capacity: {truck.capacity_kg} kg</div>
+                    <div className="text-sm">Capacity: {truck.capacity_kg} MT</div>
                   </div>
                   <div className="text-sm">Status: <b>{truck.active ? 'Active' : 'Inactive'}</b></div>
                 </div>

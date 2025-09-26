@@ -245,9 +245,24 @@ export default function IndentsPage() {
       color?: string;
     }>;
   }
+  
+  interface CardData {
+    origin: string;
+    destination: string;
+    vehicle: string;
+    loadId: string;
+    placement: string;
 
-  const generateTableImage = async (
-    data: ImageData,
+    // Optional
+    load?: string;
+    material?: string;
+    client?: string;
+    cost?: string;
+    headerColor?: string;
+  }
+
+  const generateCardImage = async (
+    data: CardData,
     setFeedback: (msg: string | null) => void,
     setImageSrc: (url: string | null) => void
   ) => {
@@ -258,20 +273,30 @@ export default function IndentsPage() {
 
       const width = 500;
 
-      // Filter valid rows (skip Route/NA)
-      const validRows = data.rows.filter(
-        (r) => r.label !== "Route" && r.value && r.value !== "NA"
-      );
+      // Collect details for 2-column layout
+      const detailsLeft: Array<[string, string, string]> = [
+        ["🚚", "Vehicle", data.vehicle],
+        ["📅", "Placement", data.placement],
+        // ["🏤", "Client", data.client || ""],
+      ].filter((row): row is [string, string, string] => Boolean(row[2]));
 
-      // Each row ~45px tall + header (100px start offset) + bottom padding
-      const rowHeight = 45;
-      const dynamicHeight = 100 + validRows.length * rowHeight + 40;
+      const detailsRight: Array<[string, string, string]> = [
+        ["⚖️", "Load", data.load || ""],
+        ["📦", "Material", data.material || ""],
+      ].filter((row): row is [string, string, string] => Boolean(row[2]));
+
+      const rows = Math.max(detailsLeft.length, detailsRight.length);
+
+      // Dynamic card height
+      const rowHeight = 28;
+      const headerHeight = 60;
+      const footerHeight = 50;
+      const contentHeight = rows * rowHeight + 40;
+      const cardHeight = headerHeight + contentHeight + footerHeight;
 
       canvas.width = width * 2;
-      canvas.height = dynamicHeight * 2;
+      canvas.height = cardHeight * 2;
       ctx.scale(2, 2);
-      ctx.fillStyle = "#ffffff";   
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // === Helper for rounded rect ===
       function roundRect(
@@ -291,84 +316,74 @@ export default function IndentsPage() {
         ctx.closePath();
       }
 
-      // === Outer card background ===
+      // === Outer card ===
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.25)";
       ctx.shadowBlur = 12;
       ctx.shadowOffsetY = 4;
-      ctx.fillStyle = "#ffffff";
-      roundRect(ctx, 20, 20, width - 40, dynamicHeight - 40, 20);
+      ctx.fillStyle = "#1E293B";
+      roundRect(ctx, 20, 20, width - 40, cardHeight - 40, 16);
       ctx.fill();
       ctx.restore();
 
-      // === Gradient header with shadow ===
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.25)";
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 2;
-
-      const headerHeight = 50;
-      const grad = ctx.createLinearGradient(20, 20, width - 20, 20);
-      grad.addColorStop(0, "#4f46e5");
-      grad.addColorStop(1, "#9333ea");
-      ctx.fillStyle = grad;
-
-      // Only top corners rounded
+      // === Header ===
+      ctx.fillStyle = data.headerColor || "#b91c1c";
       ctx.beginPath();
-      ctx.moveTo(20 + 20, 20);
-      ctx.arcTo(width - 20, 20, width - 20, 20 + 20, 20);
+      ctx.moveTo(20 + 16, 20);
+      ctx.arcTo(width - 20, 20, width - 20, 20 + 16, 16);
       ctx.lineTo(width - 20, 20 + headerHeight);
       ctx.lineTo(20, 20 + headerHeight);
-      ctx.lineTo(20, 20 + 20);
-      ctx.arcTo(20, 20, 20 + 20, 20, 20);
+      ctx.lineTo(20, 20 + 16);
+      ctx.arcTo(20, 20, 20 + 16, 20, 16);
       ctx.closePath();
       ctx.fill();
 
-      ctx.restore();
-
-      // === Header Text ===
+      // Header text
       ctx.fillStyle = "#fff";
       ctx.font = "bold 18px Arial";
-      const headerText =
-        data.rows.find((r) => r.label === "Route")?.value || "Route";
-      ctx.fillText(headerText, 40, 50);
+      const originTextWidth = ctx.measureText(data.origin).width;
+      ctx.fillText(data.origin, 40, 65);
+      ctx.fillText("→", 40 + originTextWidth + 10, 65);
+      ctx.fillText(data.destination, 40 + originTextWidth + 40, 65);
 
-      // === Rows (dynamically with row backgrounds + stripes) ===
+      // Load ID
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "14px monospace";
+      ctx.fillText(data.loadId, 40, 40);
+
+      // === Two-column details ===
       let y = 100;
-      validRows.forEach((row, idx) => {
-        // Alternating striped background
-        const bgColor = idx % 2 === 0 ? "#f3f4f6" : "#e5e7eb";
+      ctx.font = "12px Arial";
+      ctx.fillStyle = "#fff";
 
-        // Row background with rounded corners + shadow
-        ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.25)";
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 3;
-        ctx.fillStyle = bgColor;
-        roundRect(ctx, 40, y - 20, width - 80, 35, 8);
-        ctx.fill();
-        ctx.restore();
+      for (let i = 0; i < rows; i++) {
+        // Left col
+        if (detailsLeft[i]) {
+          const [icon, label, value] = detailsLeft[i];
+          ctx.fillText(icon + " " + label + ":", 40, y);
+          ctx.font = "bold 14px Arial";
+          ctx.fillText(value, 150, y);
+          ctx.font = "14px Arial";
+        }
 
-        // Label with icons
-        ctx.font = "14px Arial";
-        ctx.fillStyle = "#374151";
-        let labelText = row.label;
-        if (row.label === "Vehicle") labelText = `🚚 ${row.label}`;
-        else if (row.label === "Load ID") labelText = `🆔 ${row.label}`;
-        else if (row.label === "Placement At") labelText = `📅 Placement`;
-        else if (row.label === "TAT") labelText = `⏱ ${row.label}`;
-        else if (row.label === "Load" || row.label === "Material")
-          labelText = `📦 ${row.label}`;
-        else if (row.label === "Client") labelText = `🏤 ${row.label}`;
-        else if (row.label === "Trip Cost") labelText = `💰 ${row.label}`;
-
-        ctx.fillText(`${labelText}:`, 60, y);
-        ctx.font = row.label === "Vehicle" ? "bold 14px Arial" : "14px Arial";
-        ctx.fillStyle = "#111827";
-        ctx.fillText(row.value, 180, y);
+        // Right col
+        if (detailsRight[i]) {
+          const [icon, label, value] = detailsRight[i];
+          ctx.fillText(icon + " " + label + ":", 300, y);
+          ctx.font = "bold 14px Arial";
+          ctx.fillText(value, 380, y);
+          ctx.font = "14px Arial";
+        }
 
         y += rowHeight;
-      });
+      }
+
+      // === Bottom section ===
+      if (data.cost) {
+        ctx.fillStyle = "#22c55e";
+        ctx.font = "bold 18px Arial";
+        ctx.fillText(`₹${data.cost}`, 40, cardHeight - 40);
+      }
 
       // === Export ===
       const blob = await new Promise<Blob | null>((resolve) => {
@@ -378,17 +393,14 @@ export default function IndentsPage() {
 
       const url = URL.createObjectURL(blob);
       setImageSrc(url);
-      setFeedback("Image generated!");
+      setFeedback("Card image generated!");
       setTimeout(() => setFeedback(null), 3000);
     } catch (error) {
-      console.error("Error generating table image:", error);
-      setFeedback("Failed to generate image. Please try again.");
+      console.error("Error generating card image:", error);
+      setFeedback("Failed to generate image.");
       setTimeout(() => setFeedback(null), 3000);
     }
   };
-
-
-
 
   const validateForm = () => {
     if (!form.client_id) return 'Please select a client.';
@@ -1224,24 +1236,23 @@ export default function IndentsPage() {
                         size="sm"
                         className="text-green-600 border-green-600 hover:bg-green-50"
                         onClick={async () => {
-                          const loadDetails = {
-                            caption: `Checkout this load ${i.short_id}`,
-                            rows: [
-                              { label: 'Route', value: `${i.origin} ⮕ ${i.destination}`, isBold: true, fontSize: 14 },
-                              { label: 'Vehicle', value: i.vehicle_type || 'NA' },
-                              { label: 'Load', value: i.load_weight_kg ? `${i.load_weight_kg} MT` : 'NA'},
-                              { label: 'Material', value: `${i.load_material || ''}`.trim() || 'NA' },
-                              { label: 'Placement At', value: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA' },
-                              // { label: 'Client', value: i.clients?.name || 'NA' },
-                              // { label: 'Trip Cost', value: i.trip_cost ? `₹${i.trip_cost}` : 'NA' },
-                              { label: 'Load ID', value: i.short_id },
-                            ],
+                          const card: CardData = {
+                            origin: `${i.origin}`,
+                            destination: `${i.destination}`,
+                            vehicle:  i.vehicle_type || 'NA',
+                            load: i.load_weight_kg ? `${i.load_weight_kg} MT` : "",
+                            material: `${i.load_material || ''}`.trim() || "" ,
+                            placement: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA',
+                            client: i.clients.name,
+                            cost: i.trip_cost,
+                            loadId: i.short_id,
+                            headerColor: "#b91c1c", // red
                           };
-                          console.log(loadDetails);
-                          await generateTableImage(loadDetails, setFeedback, setImageSrc);
+                          console.log(card);
+                          await generateCardImage(card, setFeedback, setImageSrc);
 
                           // const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
-                          const message = encodeURIComponent(`Hello, checkout this load\n\nFind more loads at https://freight24.in/\n\n`);
+                          const message = encodeURIComponent(`Hello, checkout this load\n\nFind more loads at https://freight24.in\n\n`);
                           setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
                         }}
                       >
