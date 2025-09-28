@@ -9,10 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea"; // Added import
 import Navbar from '@/components/ui/Navbar';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import { Users, Truck, Route, FileText, Search, Bell, UserCircle, UserRound, ChevronLeft, Menu, Pencil } from 'lucide-react';
+import { Users, Truck, Route, FileText, Search, Bell, UserCircle, UserRound, ChevronLeft, Menu, Pencil, Plus, Trash } from 'lucide-react';
+import { useFieldArray, useForm } from 'react-hook-form'; // Added useFieldArray, useForm
+
+interface PreferredRoute {
+  from: string;
+  to: string;
+}
 
 interface Profile {
   id: string;
@@ -28,6 +35,8 @@ interface TruckOwnerDetails {
   bank_ifsc_code: string | null;
   upi_id: string | null;
   town_city: string | null;
+  preferred_routes: PreferredRoute[] | null; // Added
+  notes: string | null; // Added
 }
 
 interface TruckOwner extends Profile {
@@ -37,6 +46,8 @@ interface TruckOwner extends Profile {
   bank_ifsc_code: string | null;
   upi_id: string | null;
   town_city: string | null;
+  preferred_routes: PreferredRoute[] | null; // Added
+  notes: string | null; // Added
 }
 
 interface Truck {
@@ -118,7 +129,6 @@ const calculatePaymentCleared = (trip: any) => {
 
 const calculateBalance = (trip: any) => {
   const tripCost = trip.trip_payments?.trip_cost || 0;
-  // Vehicle Providers get back this for letting their trucks halt due to client's delay in handling the load
   const vehicle_halting_charges = trip.trip_payments?.halting_charges || 0;
   const deductions = [
     trip.trip_payments?.advance_payment || 0,
@@ -145,6 +155,19 @@ const getTripEarnings = (payment: Payment) => {
   return formatCurrency(client_cost - amount_paid_to_vehicle_provider);
 };
 
+interface EditFormData {
+  full_name: string;
+  phone: string;
+  role: string;
+  aadhaar_or_pan: string;
+  bank_account_number: string;
+  bank_ifsc_code: string;
+  upi_id: string;
+  town_city: string;
+  preferred_routes: PreferredRoute[];
+  notes: string;
+}
+
 export default function ProfilesPage() {
   const [adminProfile, setAdminProfile] = useState<Profile | null>(null);
   const [truckOwners, setTruckOwners] = useState<TruckOwner[]>([]);
@@ -157,33 +180,25 @@ export default function ProfilesPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    phone: '',
-    role: 'truck_owner',
-    aadhaar_or_pan: '',
-    bank_account_number: '',
-    bank_ifsc_code: '',
-    upi_id: '',
-    town_city: '',
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<EditFormData>({
+    defaultValues: {
+      full_name: '',
+      phone: '',
+      role: 'truck_owner',
+      aadhaar_or_pan: '',
+      bank_account_number: '',
+      bank_ifsc_code: '',
+      upi_id: '',
+      town_city: '',
+      preferred_routes: [{ from: '', to: '' }],
+      notes: '',
+    },
   });
-  const [initialFormValues, setInitialFormValues] = useState({
-    full_name: '',
-    phone: '',
-    role: 'truck_owner',
-    aadhaar_or_pan: '',
-    bank_account_number: '',
-    bank_ifsc_code: '',
-    upi_id: '',
-    town_city: '',
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'preferred_routes',
   });
-  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const router = useRouter();
-
-  // Check if any form field has changed
-  const hasChanges = Object.keys(editForm).some(
-    key => editForm[key as keyof typeof editForm] !== initialFormValues[key as keyof typeof initialFormValues]
-  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -214,7 +229,9 @@ export default function ProfilesPage() {
             bank_account_number,
             bank_ifsc_code,
             upi_id,
-            town_city
+            town_city,
+            preferred_routes,
+            notes
           )
         `)
         .in('role', ['truck_owner', 'truck_agent'])
@@ -223,6 +240,8 @@ export default function ProfilesPage() {
       const formattedOwners = ownersData?.map(owner => ({
         ...owner,
         truck_owners: owner.truck_owners || [],
+        preferred_routes: owner.truck_owners[0]?.preferred_routes || null,
+        notes: owner.truck_owners[0]?.notes || null,
       })) || [];
       setTruckOwners(formattedOwners);
 
@@ -289,20 +308,6 @@ export default function ProfilesPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    if (!editForm.full_name.trim()) errors.full_name = 'Full name is required';
-    if (!editForm.phone.match(/^\+?[1-9]\d{1,14}$/)) errors.phone = 'Invalid phone number';
-    if (!editForm.aadhaar_or_pan.match(/^[A-Z0-9]{10}$|^[0-9]{12}$/)) {
-      errors.aadhaar_or_pan = 'Aadhaar (12 digits) or PAN (10 alphanumeric) required';
-    }
-    if (editForm.bank_ifsc_code && !editForm.bank_ifsc_code.match(/^[A-Z]{4}0[A-Z0-9]{6}$/)) {
-      errors.bank_ifsc_code = 'Invalid IFSC code';
-    }
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
   const handleEditClick = () => {
     if (selectedOwner) {
       const initialValues = {
@@ -314,24 +319,23 @@ export default function ProfilesPage() {
         bank_ifsc_code: selectedOwner.truck_owners[0]?.bank_ifsc_code || '',
         upi_id: selectedOwner.truck_owners[0]?.upi_id || '',
         town_city: selectedOwner.truck_owners[0]?.town_city || '',
+        preferred_routes: selectedOwner.preferred_routes?.length ? selectedOwner.preferred_routes : [{ from: '', to: '' }],
+        notes: selectedOwner.notes || '',
       };
-      setEditForm(initialValues);
-      setInitialFormValues(initialValues);
+      reset(initialValues);
       setIsEditModalOpen(true);
     }
   };
 
-  const handleSaveChanges = async () => {
-    if (!validateForm()) return;
-
+  const handleSaveChanges = async (data: EditFormData) => {
     try {
       // Update profiles table
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          full_name: editForm.full_name,
-          phone: editForm.phone,
-          role: editForm.role,
+          full_name: data.full_name,
+          phone: data.phone,
+          role: data.role,
         })
         .eq('id', selectedOwner?.id);
 
@@ -344,15 +348,18 @@ export default function ProfilesPage() {
         .eq('profile_id', selectedOwner?.id)
         .single();
 
+      const filteredRoutes = data.preferred_routes.filter(route => route.from.trim() && route.to.trim());
       if (existingTruckOwner) {
         const { error: truckOwnerError } = await supabase
           .from('truck_owners')
           .update({
-            aadhaar_or_pan: editForm.aadhaar_or_pan,
-            bank_account_number: editForm.bank_account_number || null,
-            bank_ifsc_code: editForm.bank_ifsc_code || null,
-            upi_id: editForm.upi_id || null,
-            town_city: editForm.town_city || null,
+            aadhaar_or_pan: data.aadhaar_or_pan,
+            bank_account_number: data.bank_account_number || null,
+            bank_ifsc_code: data.bank_ifsc_code || null,
+            upi_id: data.upi_id || null,
+            town_city: data.town_city || null,
+            preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+            notes: data.notes || null,
           })
           .eq('profile_id', selectedOwner?.id);
         if (truckOwnerError) throw truckOwnerError;
@@ -361,11 +368,13 @@ export default function ProfilesPage() {
           .from('truck_owners')
           .insert({
             profile_id: selectedOwner?.id,
-            aadhaar_or_pan: editForm.aadhaar_or_pan,
-            bank_account_number: editForm.bank_account_number || null,
-            bank_ifsc_code: editForm.bank_ifsc_code || null,
-            upi_id: editForm.upi_id || null,
-            town_city: editForm.town_city || null,
+            aadhaar_or_pan: data.aadhaar_or_pan,
+            bank_account_number: data.bank_account_number || null,
+            bank_ifsc_code: data.bank_ifsc_code || null,
+            upi_id: data.upi_id || null,
+            town_city: data.town_city || null,
+            preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+            notes: data.notes || null,
           });
         if (truckOwnerError) throw truckOwnerError;
       }
@@ -376,38 +385,44 @@ export default function ProfilesPage() {
           owner.id === selectedOwner?.id
             ? {
                 ...owner,
-                full_name: editForm.full_name,
-                phone: editForm.phone,
-                role: editForm.role,
+                full_name: data.full_name,
+                phone: data.phone,
+                role: data.role,
                 truck_owners: [{
-                  aadhaar_or_pan: editForm.aadhaar_or_pan,
-                  bank_account_number: editForm.bank_account_number || null,
-                  bank_ifsc_code: editForm.bank_ifsc_code || null,
-                  upi_id: editForm.upi_id || null,
-                  town_city: editForm.town_city || null,
+                  aadhaar_or_pan: data.aadhaar_or_pan,
+                  bank_account_number: data.bank_account_number || null,
+                  bank_ifsc_code: data.bank_ifsc_code || null,
+                  upi_id: data.upi_id || null,
+                  town_city: data.town_city || null,
+                  preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+                  notes: data.notes || null,
                 }],
+                preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+                notes: data.notes || null,
               }
             : owner
         )
       );
       setSelectedOwner({
         ...selectedOwner!,
-        full_name: editForm.full_name,
-        phone: editForm.phone,
-        role: editForm.role,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role,
         truck_owners: [{
-          aadhaar_or_pan: editForm.aadhaar_or_pan,
-          bank_account_number: editForm.bank_account_number || null,
-          bank_ifsc_code: editForm.bank_ifsc_code || null,
-          upi_id: editForm.upi_id || null,
-          town_city: editForm.town_city || null,
+          aadhaar_or_pan: data.aadhaar_or_pan,
+          bank_account_number: data.bank_account_number || null,
+          bank_ifsc_code: data.bank_ifsc_code || null,
+          upi_id: data.upi_id || null,
+          town_city: data.town_city || null,
+          preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+          notes: data.notes || null,
         }],
+        preferred_routes: filteredRoutes.length ? filteredRoutes : null,
+        notes: data.notes || null,
       });
       setIsEditModalOpen(false);
-      setFormErrors({});
     } catch (error) {
       console.error('Error updating profile:', error);
-      setFormErrors({ general: 'Failed to update profile. Please try again.' });
     }
   };
 
@@ -420,20 +435,18 @@ export default function ProfilesPage() {
   const getOwnerTrucks = (ownerId: string) => trucks.filter(t => t.owner_id === ownerId);
   const getTruckTrips = (truckId: string) => trips.filter(t => t.truck_id === truckId);
   const getOwnerTrips = (ownerId: string) => {
-    // const ownerTruckIds = getOwnerTrucks(ownerId).map(t => t.id);
-    // return trips.filter(t => t.truck_id && ownerTruckIds.includes(t.truck_id));
     console.log("Filtered trips for owner id : ", ownerId);
     return trips.filter(t => t.profile?.id === ownerId)
   };
   const getTripTruck = (trip: Trip) => trucks.find(t => t.id === trip.truck_id);
   const getTripOwner = (trip: Trip) => truckOwners.find(o => getOwnerTrucks(o.id).some(t => t.id === trip.truck_id));
-  
+
   const getTripGrossProfit = (payment: Payment) => {
-    return formatCurrency((payment.client_cost? payment.client_cost : 0) - (payment.trip_cost));
+    return formatCurrency((payment.client_cost ? payment.client_cost : 0) - (payment.trip_cost));
   };
 
   const getTripEarnings = (payment: Payment) => {
-    const client_cost = payment.client_cost? payment.client_cost : 0;
+    const client_cost = payment.client_cost ? payment.client_cost : 0;
     if (client_cost === 0) return 0;
     if (payment.advance_payment === 0 || payment.final_payment === 0) return 0;
     const amount_paid_to_vehicle_provider = payment.advance_payment + payment.final_payment + payment.halting_charges;
@@ -604,39 +617,41 @@ export default function ProfilesPage() {
                   </Button>
                 </div>
 
-                
-
                 <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                   <DialogContent className="max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Edit Profile</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <form onSubmit={handleSubmit(handleSaveChanges)} className="space-y-4">
                       <div>
                         <Label htmlFor="full_name">Full Name</Label>
                         <Input
                           id="full_name"
-                          value={editForm.full_name}
-                          onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                          className={formErrors.full_name ? 'border-red-500' : ''}
+                          {...register('full_name', { required: 'Full name is required' })}
+                          className={errors.full_name ? 'border-red-500' : ''}
                         />
-                        {formErrors.full_name && <p className="text-red-500 text-sm">{formErrors.full_name}</p>}
+                        {errors.full_name && <p className="text-red-500 text-sm">{errors.full_name.message}</p>}
                       </div>
                       <div>
                         <Label htmlFor="phone">Phone</Label>
                         <Input
                           id="phone"
-                          value={editForm.phone}
-                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          className={formErrors.phone ? 'border-red-500' : ''}
+                          {...register('phone', {
+                            required: 'Phone is required',
+                            pattern: {
+                              value: /^\+?[1-9]\d{1,14}$/,
+                              message: 'Invalid phone number',
+                            },
+                          })}
+                          className={errors.phone ? 'border-red-500' : ''}
                         />
-                        {formErrors.phone && <p className="text-red-500 text-sm">{formErrors.phone}</p>}
+                        {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
                       </div>
                       <div>
                         <Label htmlFor="role">Role</Label>
                         <Select
-                          value={editForm.role}
-                          onValueChange={(value) => setEditForm({ ...editForm, role: value })}
+                          value={watch('role')}
+                          onValueChange={(value) => setValue('role', value)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select role" />
@@ -646,65 +661,114 @@ export default function ProfilesPage() {
                             <SelectItem value="truck_agent">Truck Agent</SelectItem>
                           </SelectContent>
                         </Select>
+                        <input type="hidden" {...register('role')} />
                       </div>
                       <div>
                         <Label htmlFor="aadhaar_or_pan">Aadhaar / PAN</Label>
                         <Input
                           id="aadhaar_or_pan"
-                          value={editForm.aadhaar_or_pan}
-                          onChange={(e) => setEditForm({ ...editForm, aadhaar_or_pan: e.target.value })}
-                          className={formErrors.aadhaar_or_pan ? 'border-red-500' : ''}
+                          {...register('aadhaar_or_pan', {
+                            required: 'Aadhaar or PAN is required',
+                            pattern: {
+                              value: /^[A-Z0-9]{10}$|^[0-9]{12}$/,
+                              message: 'Aadhaar (12 digits) or PAN (10 alphanumeric) required',
+                            },
+                          })}
+                          className={errors.aadhaar_or_pan ? 'border-red-500' : ''}
                         />
-                        {formErrors.aadhaar_or_pan && <p className="text-red-500 text-sm">{formErrors.aadhaar_or_pan}</p>}
+                        {errors.aadhaar_or_pan && <p className="text-red-500 text-sm">{errors.aadhaar_or_pan.message}</p>}
                       </div>
                       <div>
                         <Label htmlFor="town_city">City</Label>
                         <Input
                           id="town_city"
-                          value={editForm.town_city}
-                          onChange={(e) => setEditForm({ ...editForm, town_city: e.target.value })}
+                          {...register('town_city')}
                         />
                       </div>
                       <div>
                         <Label htmlFor="bank_account_number">Bank Account Number</Label>
                         <Input
                           id="bank_account_number"
-                          value={editForm.bank_account_number}
-                          onChange={(e) => setEditForm({ ...editForm, bank_account_number: e.target.value })}
+                          {...register('bank_account_number')}
                         />
                       </div>
                       <div>
                         <Label htmlFor="bank_ifsc_code">IFSC Code</Label>
                         <Input
                           id="bank_ifsc_code"
-                          value={editForm.bank_ifsc_code}
-                          onChange={(e) => setEditForm({ ...editForm, bank_ifsc_code: e.target.value })}
-                          className={formErrors.bank_ifsc_code ? 'border-red-500' : ''}
+                          {...register('bank_ifsc_code', {
+                            pattern: {
+                              value: /^[A-Z]{4}0[A-Z0-9]{6}$/,
+                              message: 'Invalid IFSC code',
+                            },
+                          })}
+                          className={errors.bank_ifsc_code ? 'border-red-500' : ''}
                         />
-                        {formErrors.bank_ifsc_code && <p className="text-red-500 text-sm">{formErrors.bank_ifsc_code}</p>}
+                        {errors.bank_ifsc_code && <p className="text-red-500 text-sm">{errors.bank_ifsc_code.message}</p>}
                       </div>
                       <div>
                         <Label htmlFor="upi_id">UPI ID</Label>
                         <Input
                           id="upi_id"
-                          value={editForm.upi_id}
-                          onChange={(e) => setEditForm({ ...editForm, upi_id: e.target.value })}
+                          {...register('upi_id')}
                         />
                       </div>
-                      {formErrors.general && <p className="text-red-500 text-sm">{formErrors.general}</p>}
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveChanges} disabled={!hasChanges}>
-                        Save Changes
-                      </Button>
-                    </DialogFooter>
+                      <div className="space-y-2">
+                        <Label>Preferred Routes (Optional)</Label>
+                        {fields.map((field, index) => (
+                          <div key={field.id} className="flex items-end gap-2 mb-2">
+                            <div className="flex-1">
+                              <Input
+                                placeholder="From (e.g., Bangalore)"
+                                {...register(`preferred_routes.${index}.from` as const)}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <Input
+                                placeholder="To (e.g., Mumbai)"
+                                {...register(`preferred_routes.${index}.to` as const)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => remove(index)}
+                              disabled={fields.length === 1}
+                            >
+                              <Trash size={16} />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => append({ from: '', to: '' })}
+                          className="mt-2"
+                        >
+                          <Plus size={16} className="mr-2" /> Add Route
+                        </Button>
+                      </div>
+                      <div>
+                        <Label htmlFor="notes">Notes</Label>
+                        <Textarea
+                          id="notes"
+                          {...register('notes')}
+                        />
+                      </div>
+                      {/* {formErrors.general && <p className="text-red-500 text-sm">{formErrors.general}</p>} */}
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={!isDirty}>
+                          Save Changes
+                        </Button>
+                      </DialogFooter>
+                    </form>
                   </DialogContent>
                 </Dialog>
 
-                
                 <div className="grid md:grid-cols-[minmax(200px,0.8fr)_1.2fr] md:auto-rows-auto gap-6">
                   <Card className="bg-white">
                     <CardContent className="mt-4 space-y-4">
@@ -721,6 +785,18 @@ export default function ProfilesPage() {
                       {selectedOwner.truck_owners[0]?.upi_id && (
                         <p><strong>UPI ID:</strong> {selectedOwner.truck_owners[0].upi_id}</p>
                       )}
+                      <p>
+                        <strong>Preferred Routes:</strong> <br />
+                        {selectedOwner.preferred_routes?.length
+                          ? selectedOwner.preferred_routes.map((route, index) => (
+                              <span key={index}>
+                                {route.from} → {route.to}
+                                <br />
+                              </span>
+                            ))
+                          : 'None'}
+                      </p>
+                      <p><strong>Notes:</strong> {selectedOwner.notes || 'N/A'}</p>
                       <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
                     </CardContent>
                   </Card>
@@ -836,9 +912,6 @@ export default function ProfilesPage() {
               </Button>
               <h3 className="text-lg font-semibold mt-6 mb-1">Truck Details</h3>
               <Card className="bg-white mb-6">
-                {/* <CardHeader>
-                  <h2 className="text-xl font-semibold"></h2>
-                </CardHeader> */}
                 <CardContent className="space-y-4 mt-4">
                   <p><strong>Number:</strong> {selectedTruck.vehicle_number}</p>
                   <p><strong>Type:</strong> {selectedTruck.vehicle_type}</p>
@@ -889,9 +962,6 @@ export default function ProfilesPage() {
               </Button>
               <h3 className="text-lg font-semibold mt-6 mb-1">Trip Details</h3>
               <Card className="bg-white mb-6">
-                {/* <CardHeader>
-                  <h2 className="text-xl font-semibold">Trip Details</h2>
-                </CardHeader> */}
                 <CardContent className="space-y-4 mt-4">
                   <p><strong>ID:</strong> {selectedTrip.short_id}</p>
                   <p><strong>Route:</strong> {selectedTrip.origin} → {selectedTrip.destination}</p>
@@ -910,11 +980,7 @@ export default function ProfilesPage() {
               </Card>
               <h3 className="text-lg font-semibold mt-6 mb-1">Payment Information</h3>
               <Card className="bg-white mb-6">
-                {/* <CardHeader>
-                  <h3 className="text-lg font-semibold">Payment Information</h3>
-                </CardHeader> */}
                 <CardContent className="space-y-4 mt-4">
-                  {/* <br></br> */}
                   {selectedTrip.payments ? (
                     <>
                       <p><strong>Client Cost:</strong> {formatCurrency(selectedTrip.payments.client_cost)}</p>
@@ -951,7 +1017,7 @@ export default function ProfilesPage() {
                 <p>No associated truck found.</p>
               )}
               <h3 className="text-lg font-semibold mt-6 mb-1">Truck Provider</h3>
-              {selectedTrip.profile? (
+              {selectedTrip.profile ? (
                 <Card className="bg-white">
                   <CardContent className="space-y-4 mt-4">
                     <p><strong>Name:</strong> {selectedTrip.profile?.full_name || 'N/A'}</p>

@@ -1,17 +1,23 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea'; // Add this import
 import Navbar from '@/components/ui/Navbar';
-import { User, CreditCard, Phone, X } from 'lucide-react';
+import { User, CreditCard, Phone, X, Plus, Trash } from 'lucide-react';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
+
+interface PreferredRoute {
+  from: string;
+  to: string;
+}
 
 interface TruckOwnerForm {
   full_name: string;
@@ -22,6 +28,8 @@ interface TruckOwnerForm {
   upi_id: string;
   town_city: string;
   role: 'truck_owner' | 'truck_agent' | '';
+  preferred_routes: PreferredRoute[]; // New: Array of route pairs
+  notes: string; // New: Notes field
 }
 
 export default function TruckOwnersPage() {
@@ -31,7 +39,7 @@ export default function TruckOwnersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo') || '/trucks';
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<TruckOwnerForm>({
+  const { register, handleSubmit, setValue, reset, control, formState: { errors } } = useForm<TruckOwnerForm>({
     defaultValues: {
       full_name: '',
       phone: '',
@@ -40,16 +48,23 @@ export default function TruckOwnersPage() {
       bank_ifsc_code: '',
       upi_id: '',
       town_city: '',
-      role: '', // Empty default value for role
+      role: '',
+      preferred_routes: [{ from: '', to: '' }], // Start with one empty route pair
+      notes: '',
     }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'preferred_routes',
   });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log('Checking auth...'); // Debug log
+        console.log('Checking auth...');
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        console.log('Auth response:', { user, userError }); // Debug log
+        console.log('Auth response:', { user, userError });
         if (userError || !user) {
           console.log('Auth error or no user:', userError?.message);
           router.push("/login?redirect=/truck-owners");
@@ -73,21 +88,23 @@ export default function TruckOwnersPage() {
     setError(null);
     setSuccess(null);
     try {
-      console.log('Submitting data:', data); // Debug log
-      // Convert empty bank_ifsc_code to null to satisfy the check constraint
+      console.log('Submitting data:', data);
+      // Filter out empty route pairs
+      const filteredRoutes = data.preferred_routes.filter(route => route.from.trim() && route.to.trim());
       const processedData = {
         ...data,
+        preferred_routes: filteredRoutes, // Send as array of objects
         bank_ifsc_code: data.bank_ifsc_code.trim() === '' ? null : data.bank_ifsc_code,
       };
-      console.log('Processed data for API:', processedData); // Additional debug log
+      console.log('Processed data for API:', processedData);
       const response = await fetch('/api/truck-owners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(processedData),
       });
-      console.log('Fetch response status:', response.status); // Debug log
+      console.log('Fetch response status:', response.status);
       const result = await response.json();
-      console.log('Fetch response data:', result); // Debug log
+      console.log('Fetch response data:', result);
       if (!response.ok) {
         throw new Error(result.error || 'Failed to add truck owner');
       }
@@ -95,7 +112,6 @@ export default function TruckOwnersPage() {
       if (!userId) {
         throw new Error('No user ID returned');
       }
-      // Format role for display (e.g., "truck_owner" -> "truck owner")
       const formattedRole = data.role.replace('_', ' ');
       setSuccess(`Added ${data.full_name} as a ${formattedRole} successfully!`);
       reset(); // Reset form after successful submission
@@ -178,7 +194,6 @@ export default function TruckOwnersPage() {
                       placeholder="123456789012 or ABCDE1234F"
                       className="pl-10"
                       {...register('aadhaar_or_pan', {
-                        // required: 'Aadhaar or PAN is required',
                         pattern: {
                           value: /^[A-Z0-9]{10}$|^[0-9]{12}$/,
                           message: 'Enter a valid 12-digit Aadhaar or 10-character PAN',
@@ -266,6 +281,55 @@ export default function TruckOwnersPage() {
                   </div>
                 </div>
               </div>
+
+              {/* New: Preferred Routes Section */}
+              <div className="space-y-2">
+                <Label>Preferred Routes (Optional)</Label>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex items-end gap-2 mb-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="From (e.g., Bangalore)"
+                        {...register(`preferred_routes.${index}.from` as const)}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Input
+                        placeholder="To (e.g., Mumbai)"
+                        {...register(`preferred_routes.${index}.to` as const)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => remove(index)}
+                      disabled={fields.length === 1}
+                    >
+                      <Trash size={16} />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => append({ from: '', to: '' })}
+                  className="mt-2"
+                >
+                  <Plus size={16} className="mr-2" /> Add Route
+                </Button>
+              </div>
+
+              {/* New: Notes Section */}
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any additional notes about this truck owner/agent"
+                  {...register('notes')}
+                />
+              </div>
+
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Adding...' : 'Add Truck Owner/Agent'}
               </Button>

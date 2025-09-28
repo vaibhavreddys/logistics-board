@@ -15,7 +15,9 @@ export async function GET() {
           bank_account_number,
           bank_ifsc_code,
           upi_id,
-          town_city
+          town_city,
+          preferred_routes,
+          notes
         )
       `)
       .eq('role', 'truck_owner');
@@ -47,6 +49,8 @@ export async function GET() {
         bank_ifsc_code: truckOwnerDetails.bank_ifsc_code || null,
         upi_id: truckOwnerDetails.upi_id || null,
         town_city: truckOwnerDetails.town_city || null,
+        preferred_routes: truckOwnerDetails.preferred_routes || null,
+        notes: truckOwnerDetails.notes || null,
       });
     }
 
