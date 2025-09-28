@@ -1235,25 +1235,35 @@ export default function IndentsPage() {
                         variant="outline"
                         size="sm"
                         className="text-green-600 border-green-600 hover:bg-green-50"
-                        onClick={async () => {
-                          const card: CardData = {
-                            origin: `${i.origin}`,
-                            destination: `${i.destination}`,
-                            vehicle:  i.vehicle_type || 'NA',
-                            load: i.load_weight_kg ? `${i.load_weight_kg} MT` : "",
-                            material: `${i.load_material || ''}`.trim() || "" ,
-                            placement: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA',
-                            client: i.clients.name,
-                            cost: i.trip_cost,
-                            loadId: i.short_id,
-                            headerColor: "#b91c1c", // red
-                          };
-                          console.log(card);
-                          await generateCardImage(card, setFeedback, setImageSrc);
-
-                          // const subMessage = encodeURIComponent(`Interested in load *${i.short_id}*\n${i.origin} ⮕ ${i.destination}\n${i.vehicle_type}`);
-                          const message = encodeURIComponent(`Hello, checkout this load\n\nFind more loads at https://freight24.in\n\n`);
-                          setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
+                        onClick={() => {
+                        // onClick={async () => {
+                          // const card: CardData = {
+                          //   origin: `${i.origin}`,
+                          //   destination: `${i.destination}`,
+                          //   vehicle:  i.vehicle_type || 'NA',
+                          //   load: i.load_weight_kg ? `${i.load_weight_kg} MT` : "",
+                          //   material: `${i.load_material || ''}`.trim() || "" ,
+                          //   placement: i.pickup_at ? formatDateDDMMYYYY(i.pickup_at) : 'NA',
+                          //   client: i.clients.name,
+                          //   cost: i.trip_cost,
+                          //   loadId: i.short_id,
+                          //   headerColor: "#b91c1c", // red
+                          // };
+                          // console.log(card);
+                          // await generateCardImage(card, setFeedback, setImageSrc);
+                          const route = `${i.origin} ⮕ ${i.destination}`.trim();
+                          const vehicleType = "*" + i.vehicle_type + "*\n";
+                          const placementTime = "*" + formatDateDDMMYYYY(i.pickup_at) + "*\n";
+                          const load = i.load_weight_kg ? "*" + `${i.load_weight_kg} MT` + "*" : "";
+                          const material = i.load_weight_kg ? ("*" + `${i.load_material}`.trim() + "*\n") : "";
+                          const loadInfo = load + " | " + material;
+                          const phoneNumber = "+91" + `${i.contact_phone.replace(/^\+91/, '')}`;
+                          // const id = "`" + i.short_id + "`";
+                          const indentMessage = encodeURIComponent(`*\`REQUIRED\`*\n\n*${route}*\n\n${vehicleType}\n${placementTime}\n${loadInfo}\n${phoneNumber}\n\nFind more loads at https://freight24.in\n\n`);
+                          // const message = encodeURIComponent(`Hello, checkout this load\n\nFind more loads at https://freight24.in\n\n`);
+                          // setMessageUrl(`https://wa.me/+91${i.contact_phone.replace(/^\+91/, '')}?text=${message}`);
+                          setMessageUrl(`https://wa.me/?text=${indentMessage}`);
+                          window.open(`https://wa.me/?text=${indentMessage}`);
                         }}
                       >
                         <MessageCircle size={16} />
