@@ -463,10 +463,11 @@ export default function ProfilesPage() {
         <aside
           className={`bg-gray-100 p-4 overflow-y-auto transition-all duration-300 fixed md:relative z-50 ${
             isSidebarOpen
-              ? 'w-screen h-screen md:w-80 md:h-[calc(100vh-64px)]'
-              : 'w-0 h-0 md:w-80 md:h-[calc(100vh-64px)] -ml-64 md:ml-0'
+              ? 'w-full max-w-[90vw] max-h-[calc(100vh-64px-env(safe-area-inset-bottom))] pt-16 pb-[env(safe-area-inset-bottom)] md:pt-0 md:pb-0 md:w-80 md:h-[calc(100vh-64px)]'
+              : 'w-0 h-0 md:w-80 md:h-[calc(100vh-64px)] -ml-80 md:ml-0'
           }`}
         >
+        <div className="h-full overflow-y-auto">
           <div className="mb-4">
             <h2 className="text-lg font-semibold mb-2 flex items-center">
               <Users className="mr-2" size={20} />
@@ -524,6 +525,7 @@ export default function ProfilesPage() {
               </li>
             ))}
           </ul>
+        </div>
         </aside>
 
         {/* Overlay for mobile sidebar */}
