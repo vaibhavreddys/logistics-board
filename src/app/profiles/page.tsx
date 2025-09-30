@@ -100,7 +100,6 @@ interface Trip {
 
 // Custom function for dd/mm/yyyy HH:mm format
 const formatDateDDMMYYYY = (date: string): string => {
-  console.log("Formatting Date : " + date);
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) return 'Invalid Date';
@@ -111,6 +110,19 @@ const formatDateDDMMYYYY = (date: string): string => {
     const minutes = String(d.getMinutes()).padStart(2, '0');
     const period = d.getHours() >= 12 ? 'PM' : 'AM';
     return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
+const formatDateOnly = (date: string): string => {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return 'Invalid Date';
   }
@@ -574,7 +586,7 @@ export default function ProfilesPage() {
                 <p><strong>Name:</strong> {adminProfile?.full_name || 'N/A'}</p>
                 <p><strong>Phone:</strong> {adminProfile?.phone || 'N/A'}</p>
                 <p><strong>Role:</strong> {adminProfile?.role || 'N/A'}</p>
-                <p><strong>Joined:</strong> {new Date(adminProfile?.created_at || '').toLocaleDateString()}</p>
+                <p><strong>Joined:</strong> {adminProfile?.created_at ? formatDateOnly(adminProfile?.created_at) : 'N/A'}</p>
               </CardContent>
               <CardFooter className="pt-4">
                 <a href="/truck-owners?returnTo=/profiles" className="w-full">
@@ -799,7 +811,7 @@ export default function ProfilesPage() {
                           : 'None'}
                       </p>
                       <p><strong>Notes:</strong> {selectedOwner.notes || 'N/A'}</p>
-                      <p><strong>Joined:</strong> {new Date(selectedOwner.created_at).toLocaleDateString()}</p>
+                      <p><strong>Joined:</strong> {formatDateOnly(selectedOwner.created_at)}</p>
                     </CardContent>
                   </Card>
                   <Card className="bg-white md:row-span-2">
@@ -1025,7 +1037,7 @@ export default function ProfilesPage() {
                     <p><strong>Name:</strong> {selectedTrip.profile?.full_name || 'N/A'}</p>
                     <p><strong>Phone:</strong> {selectedTrip.profile.phone || 'N/A'}</p>
                     <p><strong>Role:</strong> {selectedTrip.profile.role === 'truck_owner' ? 'Truck Owner' : 'Truck Agent'}</p>
-                    <p><strong>Joined:</strong> {new Date(selectedTrip.profile.created_at).toLocaleDateString()}</p>
+                    <p><strong>Joined:</strong> {formatDateOnly(selectedTrip.profile.created_at)}</p>
                   </CardContent>
                 </Card>
               ) : (

@@ -704,7 +704,7 @@ export default function TripsPage() {
                 {(history[selectedTripId || ''] || []).map((h, index) => (
                   <div key={h.id} className={`p-2 rounded ${index === 0 ? 'bg-gray-100 font-bold' : 'bg-white'} text-sm`}>
                     <div className="text-gray-600">
-                      {new Date(h.changed_at).toLocaleString()} — {h.to_status} by {h.profiles?.full_name || 'Unknown'}
+                      {formatDateDDMMYYYY(h.changed_at)} — {h.to_status} by {h.profiles?.full_name || 'Unknown'}
                     </div>
                   </div>
                 ))}
