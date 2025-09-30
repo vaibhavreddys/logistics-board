@@ -407,7 +407,7 @@ export default function TrucksPage() {
         </div>
         <div className="grid md:grid-cols-2 gap-3">
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-1">
               <Label>Truck Owner / Agent</Label>
               <Link href="/truck-owners?returnTo=/trucks" className="text-blue-600 hover:underline text-sm">
                 Missing Name? Add here
@@ -425,13 +425,6 @@ export default function TrucksPage() {
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <Label>Vehicle Number</Label>
-            <Input
-              value={form.vehicle_number}
-              onChange={e => setForm({ ...form, vehicle_number: e.target.value })}
-            />
           </div>
           <div>
             <Label>Vehicle Type</Label>
@@ -452,6 +445,13 @@ export default function TrucksPage() {
               <option value="8 ft (Bolero)">8 ft Pickup (Bolero / Pickup)</option>
               <option value="7 ft TataAce">7 ft Tata Ace</option>
             </select>
+          </div>
+          <div>
+            <Label>Vehicle Number</Label>
+            <Input
+              value={form.vehicle_number}
+              onChange={e => setForm({ ...form, vehicle_number: e.target.value })}
+            />
           </div>
           <div>
             <Label>Capacity (MT)</Label>
@@ -550,7 +550,7 @@ export default function TrucksPage() {
 
         {/* Main Content: Trips */}
         <section className="md:w-2/3 md:pl-4 space-y-3">
-          {renderAddTruckForm(formRefDesktop, 'hidden md:block min-w-[48rem] max-w-lg mx-auto')}
+          {renderAddTruckForm(formRefDesktop, 'hidden md:block min-w-[50rem] max-w-lg mx-auto')}
           {selectedTruck && (
             <>
               <Button
