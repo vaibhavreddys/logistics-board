@@ -158,7 +158,14 @@ export default function TripsPage() {
             ),
             client_cost,
             short_id,
-            status
+            status,
+            profiles!trips_truck_provider_id_fkey (
+              id,
+              full_name,
+              phone,
+              role,
+              created_at
+            )
           `)
           .order('created_at', { ascending: false });
 
@@ -421,7 +428,14 @@ export default function TripsPage() {
           ),
           client_cost,
           short_id,
-          status
+          status,
+          profiles!trips_truck_provider_id_fkey (
+            id,
+            full_name,
+            phone,
+            role,
+            created_at
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -749,6 +763,14 @@ export default function TripsPage() {
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-100">Vehicle Type</td>
                         <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.indents?.vehicle_type || 'N/A'}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-50">Vehicle Provider</td>
+                        <td className="py-1 bg-gray-50">{trips.find(i => i.id === selectedTripId)?.profiles?.full_name || 'N/A'} <br></br>({trips.find(i => i.id === selectedTripId)?.profiles?.role === "truck_agent" ? "Truck Agent" : "Truck Owner"})</td>
+                      </tr>
+                      <tr className="border-b border-gray-200">
+                        <td className="font-medium pr-2 py-1 bg-gray-100">Vehicle Provider Phone</td>
+                        <td className="py-1 bg-gray-100">{trips.find(i => i.id === selectedTripId)?.profiles?.phone || 'N/A'}</td>
                       </tr>
                       <tr className="border-b border-gray-200">
                         <td className="font-medium pr-2 py-1 bg-gray-50">Load</td>
