@@ -441,7 +441,8 @@ export default function ProfilesPage() {
   const filteredOwners = truckOwners.filter(owner =>
     owner.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     owner.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (owner.truck_owners[0]?.town_city || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (owner.truck_owners[0]?.town_city || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (owner.truck_owners[0]?.aadhaar_or_pan || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getOwnerTrucks = (ownerId: string) => trucks.filter(t => t.owner_id === ownerId);
