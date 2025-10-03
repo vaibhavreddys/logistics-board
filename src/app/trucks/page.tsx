@@ -41,8 +41,27 @@ interface Trip {
   origin: string;
   destination: string;
   created_at: string;
+  start_time: string;
+  end_time: string;
   indents: { origin: string, destination: string };
 }
+
+// Custom function for dd/mm/yyyy HH:mm format
+const formatDateDDMMYYYY = (date: string): string => {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = d.getFullYear();
+    const hours = d.getHours() % 12 || 12; // Convert to 12-hour format
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const period = d.getHours() >= 12 ? 'PM' : 'AM';
+    return `${day}/${month}/${year} ${hours}:${minutes} ${period}`;
+  } catch {
+    return 'Invalid Date';
+  }
+};
 
 const formatDateOnly = (date: string): string => {
   try {
@@ -139,6 +158,8 @@ export default function TrucksPage() {
             truck_id,
             status,
             created_at,
+            start_time,
+            end_time,
             indents!trips_indent_id_fkey(origin, destination)
           `)
           .in('truck_id', truckIds)
@@ -576,33 +597,49 @@ export default function TrucksPage() {
               >
                 <ChevronLeft size={16} className="mr-2" /> Back to Trucks
               </Button>
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-bold">Trips for {selectedTruck.vehicle_number}</h2>
-                </CardHeader>
-                <CardContent>
-                  {trips.filter(trip => trip.truck_id === selectedTruck.id).length === 0 ? (
-                    <p className="text-gray-500">No trips serviced by this truck.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {trips
-                        .filter(trip => trip.truck_id === selectedTruck.id)
-                        .map(trip => (
-                          <Card key={trip.id} className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-semibold">{trip.short_id}</div>
-                                <div className="text-sm">Route: {trip.origin} → {trip.destination}</div>
-                                <div className="text-sm">Status: {trip.status}</div>
-                                <div className="text-sm">Created: {formatDateOnly(trip.created_at)}</div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="space-y-3">
+                {trips
+                  .filter(trip => trip.truck_id === selectedTruck.id)
+                  .map((trip, idx) => (
+                    <Card
+                      key={trip.id}
+                      className={`p-4 ${idx !== 0 ? "border-t border-gray-200" : ""}`}
+                    >
+                      {/* Trip ID as heading */}
+                      <div className="font-semibold text-lg mb-3">{trip.short_id}</div>
+
+                      {/* Details grid */}
+                      <dl className="grid grid-cols-2 gap-x-1 gap-y-2 text-sm">
+                        <dt className="text-gray-500 font-medium">Route:</dt>
+                        <dd className="text-gray-900">{trip.origin} → {trip.destination}</dd>
+                        <dt className="text-gray-500 font-medium">Status:</dt>
+                        <dd>
+                          <span
+                            className={`inline-flex items-center px-1 py-0.5 rounded-full text-xs font-medium capitalize
+                              ${trip.status === "completed" ? "bg-green-100 text-green-800" : ""}
+                              ${trip.status === "started" ? "bg-yellow-100 text-yellow-800" : ""}
+                              ${trip.status === "pending" ? "bg-gray-100 text-gray-800" : ""}
+                            `}
+                          >
+                            {trip.status}
+                          </span>
+                        </dd>
+                        <dt className="text-gray-500 font-medium">Created:</dt>
+                        <dd className="text-gray-900">{formatDateDDMMYYYY(trip.created_at)}</dd>
+
+                        {trip.status === "completed" && (
+                          <>
+                            <dt className="text-gray-500 font-medium">Started At:</dt>
+                            <dd className="text-gray-900">{formatDateDDMMYYYY(trip.start_time)}</dd>
+
+                            <dt className="text-gray-500 font-medium">Completed At:</dt>
+                            <dd className="text-gray-900">{formatDateDDMMYYYY(trip.end_time)}</dd>
+                          </>
+                        )}
+                      </dl>
+                    </Card>
+                  ))}
+              </div>
             </>
           )}
         </section>
